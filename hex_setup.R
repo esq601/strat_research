@@ -33,6 +33,8 @@ for(j in 0:14){
   }
 }
 
+
+
 # Create center-points of hexes
 
 df2 <- df1 %>%
@@ -85,12 +87,6 @@ for(i in 1:nrow(df2)) {
 hexdf1 <- hexdf %>%
   group_by(pos)
 
-# Plot of the field
-
-ggplot(hexdf1, aes (x=x_h, y = y_h,group = pos)) +
-  geom_polygon(color = 'black', fill = 'transparent') +
-  coord_equal() +
-  theme_void()
 
 
 
@@ -117,28 +113,11 @@ hexdf2 <- hexdf1 %>%
 
 cities <- sample_n(ungroup(df2),8)
 
-#Some plots
 
-ggplot(hexdf2, aes (x=x_h, y = y_h)) +
-  geom_polygon(color = 'black',aes(group = pos,fill = disp)) +
-  geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
-  coord_equal() +
-  scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
-                    values = c('darkgreen','red','transparent')) +
-  theme_void()
 
 
 #ggsave('hexmap1.jpeg', dpi = 320)
 
-#Plot with different 'area types'
-
-ggplot(hexdf2, aes (x=x_h, y = y_h)) +
-  geom_polygon(color = 'black',aes(group = pos,fill = goals)) +
-  geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
-  coord_equal() +
-  scale_fill_manual(breaks = c('area1','area2','area3'), 
-                    values = c('#4a5a78','#7d97c7','transparent')) +
-  theme_void()
 
 #ggsave('hexmap2.jpeg', dpi = 320)
 
@@ -147,15 +126,6 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
 
 terr1 <- c('201501','191401','191502','201602','191603')
 
-#Plot with position codes
-
-ggplot(hexdf2, aes(x = x_pos, y = y_pos)) +
-  geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h), fill = 'transparent') +
-  coord_equal() +
-  scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
-                    values = c('darkgreen','red','transparent')) +
-  theme_void() +
-  geom_text(aes(label = pos),size = 3)
 
 #ggsave('hexcoord.jpeg',dpi = 320)
 
@@ -175,46 +145,14 @@ adj_df <- hexdf2 %>%
          adj5 = paste0(ifelse(x<11,paste0(0,x-1),x-1),ifelse(z<11,paste0(0,z-1),z-1),ifelse(y<10,paste0(0,y),y)),
          adj6 = paste0(ifelse(x<10,paste0(0,x),x),ifelse(z<11,paste0(0,z-1),z-1),ifelse(y<11,paste0(0,y-1),y-1))) %>%
   select(pos,contains("adj")) %>%
-  pivot_longer(cols = contains('adj'), values_to = 'adj') %>%
-  select(-name) %>%
-  filter(adj %in% hexdf2$pos)
+  pivot_longer(cols = contains('adj'), values_to = 'adj',names_to = 'a') %>%
+  rename(s = pos, sp = adj) %>%
+  filter(sp %in% hexdf2$pos)
+
+adj_df <- bind_rows(adj_df,data.frame(s=unique(adj_df$s),a = 'adj0',sp = unique(adj_df$s)))
 
 
 
 # Random walk across the board
 
-tile <- '101107'
-
-# Save a neat gif
-
-saveGIF({
-  for(i in 1:20){
-    print(tile)
-    trans <- adj_df %>%
-      filter(pos == tile)
-    
-    
-    
-    plot_df <- hexdf2 %>%
-      mutate(colorfill = case_when(
-        pos == tile ~ 'selected',
-        pos %in% trans$adj ~ 'adj',
-        TRUE ~ 'non'
-      ))
-    
-    
-    p1 <- ggplot(plot_df, aes(x = x_pos, y = y_pos)) +
-      geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h, fill = colorfill)) +
-      coord_equal() +
-      scale_fill_manual(breaks = c('selected','adj','non'), 
-                        values = c('darkgreen','lightgreen','transparent')) +
-      theme_void() +
-      labs(title = paste("Turn",i)) +
-      geom_text(aes(label = pos),size = 3)
-    tile <- sample(trans$adj,1)
-    print(p1)
-    
-  }
-  
-}, interval = .4, movie.name="test.gif",ani.res = '120',ani.height = 1300, ani.width = 1600)
-
+saveRDS(adj_df, file = "hextest.rda")
