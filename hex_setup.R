@@ -1,5 +1,5 @@
 library(tidyverse)
-library(animation)
+#library(animation)
 
 
 #This will create a roughly rectangular hex board about 12x15

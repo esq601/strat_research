@@ -29,7 +29,7 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
 
 #Plot with position codes
 
-ggplot(hexdf2 %>% filter(x<=6 & y >= 8), aes(x = x_pos, y = y_pos)) +
+ggplot(hexdf2 , aes(x = x_pos, y = y_pos)) +
   geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h), fill = 'transparent') +
   coord_equal() +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
