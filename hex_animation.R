@@ -2,7 +2,7 @@ library(gganimate)
 library(ggimage)
 
 
-table_out <- data.table(read_csv("out_table2022-08-30.csv"))
+#table_out <- data.table(read_csv("out_table2022-08-30.csv"))
 hexdt <- data.table(hexdf2)[,s := pos]
 str(table_out)
 pieces <- unique(hexdt[table_out, on = 's',list(s,id,str,type,turn,x_pos,y_pos)])

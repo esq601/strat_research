@@ -61,8 +61,8 @@ conflict <- function(conflicts,pl, tg) {
     fight_tbl <- fight_tbl[ppower, on = 'player']
     #print(fight_tbl)
     
-    players <- fight_tbl[, by = player, .(mod = .85^(sum(atk_tgt)/mean(atk_plr)))]
-    targets <- fight_tbl[, by = target, .(mod = .85^(sum(atk_plr)/mean(atk_tgt)))]
+    players <- fight_tbl[, by = player, .(mod = .75^(sum(atk_tgt)/mean(engs_tgt)))]
+    targets <- fight_tbl[, by = target, .(mod = .75^(sum(atk_plr)/mean(engs_plr)))]
   
   
   #players <- players[str < .1, str := 0]
@@ -76,22 +76,42 @@ conflict <- function(conflicts,pl, tg) {
   list(players,targets)
 }
 
+
+# .75^(.5/2)
+# .75^()
+
 # 
 #  test <- conflict(play_test[sp %in% tgt_test$s], tgt_test)
 #  test
 
 reward_conf <- function(conf_out){
   
-  slf <- ifelse(nrow(conf_out[[1]][str>0] >0),
-                mean((conf_out[[1]][str>0]$str_old - conf_out[[1]][str>0]$str)) / nrow(conf_out[[1]][abs(str-str_old)>0]),
+  slf <- ifelse(nrow(conf_out[[1]][str>0]) >0,
+                sum((conf_out[[1]][str>0]$str_old - conf_out[[1]][str>0]$str)),
                 0)
   
-  eny <- ifelse(nrow(conf_out[[2]][str>0] >0),
-                sum((conf_out[[2]][str>0]$str_old - conf_out[[2]][str>0]$str))/ nrow(conf_out[[2]][abs(str-str_old)>0]),
+  eny <- ifelse(nrow(conf_out[[2]][str>0]) >0,
+                sum((conf_out[[2]][str>0]$str_old - conf_out[[2]][str>0]$str)),
                 0)
   
-  #print(c(slf,eny))
-  20*eny - 20*slf +40*nrow(conf_out[[2]][str==0]) - 15*nrow(conf_out[[1]][str==0])
+  # print(c(slf,eny))
+  # print(conf_out[[2]])
+  
+  cbts <- nrow(conf_out[[1]]) + nrow(conf_out[[2]])
+  
+  (200*eny - 150*slf)/cbts +50*nrow(conf_out[[2]][str<0.1]) - 15*nrow(conf_out[[1]][str<0.1])
 }
 
+
+test <- list(trans[[1]],trans[[2]])
+
+trans[[1]][,str := c(.45,1)] 
+trans[[2]][,str := c(.04)]
+test <- list(trans[[1]],trans[[2]])
+
+#(test[[1]][abs(str-str_old)>0])
+test
+#mean((test[[1]][str>0]$str_old - test[[1]][str>0]$str)) / nrow(test[[1]][abs(str-str_old)>0])
+
+reward_conf(test)
 # reward_conf(test)
