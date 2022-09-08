@@ -54,6 +54,14 @@ df2 <- df1 %>%
   filter(xz_sum >6 )
 
 
+
+# hex_removal <- c('120701','130801','140901','130902',
+#                  '111712','111611','111510','111409','121509',
+#                  '080705','201501','080806','051112','080301','61212','080402',
+#                  '061111')
+# 
+# 
+# df2 <- df2 %>% filter(!(pos %in% hex_removal))
 #Create points for the verticies of hexs
 
 hexdf <- data.frame()
@@ -92,6 +100,8 @@ hexdf1 <- hexdf %>%
 
 tile <- '030710'
 
+
+
 #Create some new fields for demo purposes
 
 hexdf2 <- hexdf1 %>%
@@ -99,9 +109,8 @@ hexdf2 <- hexdf1 %>%
   left_join(df2, by = 'pos') %>%
   mutate(selected = case_when(pos == tile ~T,T ~ F)) %>%
   mutate(disp = case_when(
-    xz_sum < 12 ~ "friendly",
-    z > 17 | x > 17~'enemy',
-    T ~ 'neutral'
+    z > 17 | x > 17 & y > 16 ~'enemy',
+    T ~ 'friendly'
   )) %>%
   mutate(goals = case_when(
     x_pos > 24 & y_pos < 10 ~ 'area1',
@@ -111,7 +120,7 @@ hexdf2 <- hexdf1 %>%
 
 #Create random 'cities' or tiles for different values
 
-cities <- sample_n(ungroup(df2),8)
+cities <- df2 %>% filter(pos %in% c('151405','110702','101208','061010','040507'))
 
 
 
@@ -125,6 +134,8 @@ cities <- sample_n(ungroup(df2),8)
 
 
 terr1 <- c('201501','191401','191502','201602','191603')
+
+
 
 
 #ggsave('hexcoord.jpeg',dpi = 320)
@@ -155,4 +166,4 @@ adj_df <- bind_rows(adj_df,data.frame(s=unique(adj_df$s),a = 'adj0',sp = unique(
 
 # Random walk across the board
 
-saveRDS(adj_df, file = "hextest.rda")
+#saveRDS(adj_df, file = "hextest.rda")

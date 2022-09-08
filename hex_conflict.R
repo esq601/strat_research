@@ -102,16 +102,16 @@ reward_conf <- function(conf_out){
   (200*eny - 150*slf)/cbts +50*nrow(conf_out[[2]][str<0.1]) - 15*nrow(conf_out[[1]][str<0.1])
 }
 
-
-test <- list(trans[[1]],trans[[2]])
-
-trans[[1]][,str := c(.45,1)] 
-trans[[2]][,str := c(.04)]
-test <- list(trans[[1]],trans[[2]])
-
-#(test[[1]][abs(str-str_old)>0])
-test
-#mean((test[[1]][str>0]$str_old - test[[1]][str>0]$str)) / nrow(test[[1]][abs(str-str_old)>0])
-
-reward_conf(test)
+# 
+# test <- list(trans[[1]],trans[[2]])
+# 
+# trans[[1]][,str := c(.45,1)] 
+# trans[[2]][,str := c(.04)]
+# test <- list(trans[[1]],trans[[2]])
+# 
+# #(test[[1]][abs(str-str_old)>0])
+# test
+# #mean((test[[1]][str>0]$str_old - test[[1]][str>0]$str)) / nrow(test[[1]][abs(str-str_old)>0])
+# 
 # reward_conf(test)
+# # reward_conf(test)

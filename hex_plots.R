@@ -15,9 +15,24 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
   geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
   coord_equal() +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
-                    values = c('darkgreen','red','transparent')) +
-  theme_void()
+                    values = c('#449c59','#e34339','transparent'),
+                    labels = c("Arbathian","Donovian","None")) +
+  theme_void() +
+  labs(
+    title = "Initial Territorial Disposition",
+    fill = "Affiliation",
+    subtitle = "Key Cities Represented as Dots"
+  ) +
+  theme(
+    plot.title = element_text(hjust=.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+
+ggsave('hex_territory.png',width = 5,height = 4, units = 'in')
+
 #Plot with different 'area types'
+
+
 
 ggplot(hexdf2, aes (x=x_h, y = y_h)) +
   geom_polygon(color = 'black',aes(group = pos,fill = goals)) +
@@ -29,16 +44,100 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
 
 #Plot with position codes
 
-ggplot(hexdf2 , aes(x = x_pos, y = y_pos)) +
+
+ggplot(hexdf2 %>% filter(x_pos < 15 & y_pos > 12) , aes(x = x_pos, y = y_pos)) +
   geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h), fill = 'transparent') +
   coord_equal() +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
                     values = c('darkgreen','red','transparent')) +
   theme_void() +
-  geom_text(aes(label = pos),size = 3)
+  geom_text(aes(label = pos),size = 3) +
+  labs(
+    title = "Sample Hex-Grid with Location IDs"
+  ) +
+  theme(
+    plot.title = element_text(hjust=.5)
+  )
 
-tile <- '101107'
 
+
+ggsave('hex_sample.png',width = 4,height = 4, units = 'in')
+
+
+library(data.table)
+library(ggimage)
+
+units <- data.table(s = c('030710','020711'),str= 1, type = 'f')
+eunit <- data.table(s = c('030811'), str = 1,type = 'e')
+
+allu <- rbind(units,eunit)
+pieces <- unique(data.table(hexdf2)[allu, on = 'pos==s',list(s,str,type,x_pos,y_pos)])
+pieces[type == 'f', image := "f_inf.svg"]
+pieces[type == 'e', image := 'e_inf.svg']
+
+ggplot(hexdf2, aes (x=x_h, y = y_h)) +
+  geom_polygon(color = 'black',aes(group = pos,fill = disp),alpha = 0.2) +
+  geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
+  geom_image(data=pieces, aes(image = image,x = x_pos, y = y_pos)) +
+  geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str,x = x_pos),color='black',fill = 'green') +
+  coord_equal(xlim = c(20,max(hexdf2$x_h)),ylim = c(6, max(hexdf2$y_h))) +
+  scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
+                    values = c('#449c59','#e34339','transparent'),
+                    labels = c("Arbathian","Donovian","None")) +
+  theme_void() +
+  labs(
+    title = "Example Unit Disposition",
+    fill = "Affiliation",
+    subtitle = "All State Parameters Represented"
+  ) +
+  theme(
+    plot.title = element_text(hjust=.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+
+
+ggsave('hex_units.png',width = 5,height = 4, units = 'in')
+
+
+units <- data.table(s = c('030710','020711'),str= c(1,1), type = 'f')
+eunit <- data.table(s = c('030811','040810'), str = 1,type = 'e')
+
+allu <- rbind(units,eunit)
+pieces <- unique(data.table(hexdf2)[allu, on = 'pos==s',list(s,str,type,x_pos,y_pos)])
+pieces[type == 'f', image := "f_inf.svg"]
+pieces[type == 'e', image := 'e_inf.svg']
+pieces[,sc := 4]
+
+
+dtall <- rbind(dtall,pieces)
+
+pieces <- dtall
+#dtall[,sc:=1]
+
+ggplot(hexdf2 %>% filter(x_pos < 13 & y_pos > 14 & x_pos > 8 & y_pos < 18), aes (x=x_h, y = y_h)) +
+  geom_polygon(color = 'black',aes(group = pos,fill = disp),alpha = 0.2) +
+  # geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
+  geom_image(data=pieces, aes(image = image,x = x_pos, y = y_pos),size = .15) +
+  geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str,x = x_pos),color='black',fill = 'green') +
+  #coord_equal(xlim = c(20,max(hexdf2$x_h)),ylim = c(6, max(hexdf2$y_h))) +
+  coord_equal() +
+  scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
+                    values = c('#449c59','#e34339','transparent'),
+                    labels = c("Arbathian","Donovian","None")) +
+  theme_void() +
+  labs(
+    title = "Example Conflict Execution",
+    fill = "Affiliation"
+  ) +
+  facet_wrap(~sc) +
+  theme(
+    plot.title = element_text(hjust=.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = 'none',
+    strip.text = element_blank()
+  )
+
+ggsave('hex_conflict.png',width = 5,height = 5, units = 'in')
 # Save a neat gif
 
 saveGIF({
