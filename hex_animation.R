@@ -1,8 +1,9 @@
 library(gganimate)
 library(ggimage)
+library(data.table)
 
-
-table_out <- data.table(read_csv("out_table2022-09-06.csv"))
+source('hex_setup.R')
+table_out <- data.table(read_csv("out_table2022-09-12.csv"))
 hexdt <- data.table(hexdf2)[,s := pos]
 str(table_out)
 pieces <- unique(hexdt[table_out, on = 's',list(s,id,str,type,turn,x_pos,y_pos)])
@@ -30,7 +31,7 @@ animate(p1)
 
 
 animate(p1, height = 8, width = 10,fps = 10,duration = 20, units = "in", res = 120)
-anim_save('test_fight_4fight.gif')
+anim_save('test_fight_4fight1.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

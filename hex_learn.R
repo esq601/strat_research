@@ -462,7 +462,7 @@ q_df_pos <- gradient_function(f_players$s,e_target$s)
 
 q_df_eny <- gradient_function(e_target$s,eny_obj)
 
-# ls1 <- search_no_par(players,3,10,0.99,q_df_pos,target)
+#ls1 <- search_no_par(players,3,10,0.99,q_df_pos,target)
 # 
 # trans <- transition_function(ls1,target,q_df_pos)
 # trans

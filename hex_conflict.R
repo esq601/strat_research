@@ -61,8 +61,8 @@ conflict <- function(conflicts,pl, tg) {
     fight_tbl <- fight_tbl[ppower, on = 'player']
     #print(fight_tbl)
     
-    players <- fight_tbl[, by = player, .(mod = .75^(sum(atk_tgt)/mean(engs_tgt)))]
-    targets <- fight_tbl[, by = target, .(mod = .75^(sum(atk_plr)/mean(engs_plr)))]
+    players <- fight_tbl[, by = player, .(mod = (rnorm(1,0,.02)+.75)^(sum(atk_tgt)/mean(engs_tgt)))]
+    targets <- fight_tbl[, by = target, .(mod = (rnorm(1,0,.02)+.75)^(sum(atk_plr)/mean(engs_plr)))]
   
   
   #players <- players[str < .1, str := 0]
