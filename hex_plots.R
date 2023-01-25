@@ -67,8 +67,8 @@ ggsave('hex_sample.png',width = 4,height = 4, units = 'in')
 library(data.table)
 library(ggimage)
 
-units <- data.table(s = c('030710','020711'),str= 1, type = 'f')
-eunit <- data.table(s = c('030811'), str = 1,type = 'e')
+units <- data.table(s = c('131609','141608','111510','121408'),str= c(1,.95,1,.4), type = 'f')
+eunit <- data.table(s = c('131710','131811','151809'), str = c(.8,.7,.93),type = 'e')
 
 allu <- rbind(units,eunit)
 pieces <- unique(data.table(hexdf2)[allu, on = 'pos==s',list(s,str,type,x_pos,y_pos)])
@@ -79,20 +79,19 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
   geom_polygon(color = 'black',aes(group = pos,fill = disp),alpha = 0.2) +
   geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
   geom_image(data=pieces, aes(image = image,x = x_pos, y = y_pos)) +
-  geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str,x = x_pos),color='black',fill = 'green') +
+  geom_tile(data = pieces,aes(y = y_pos + .5,height = .1, width = 2*str,
+                              x = x_pos,color = str),fill = 'black',size = 1) +
   coord_equal(xlim = c(20,max(hexdf2$x_h)),ylim = c(6, max(hexdf2$y_h))) +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
                     values = c('#449c59','#e34339','transparent'),
                     labels = c("Arbathian","Donovian","None")) +
+  scale_color_distiller(type = 'div', palette = "RdYlGn",direction = 1, limits = c(0,1)) +
   theme_void() +
-  labs(
-    title = "Example Unit Disposition",
-    fill = "Affiliation",
-    subtitle = "All State Parameters Represented"
-  ) +
+
   theme(
     plot.title = element_text(hjust=.5),
-    plot.subtitle = element_text(hjust = 0.5)
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = 'none'
   )
 
 

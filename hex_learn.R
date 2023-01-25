@@ -441,17 +441,19 @@ transition_function <- function(players,target,q_df,conf_all){
 
 
 f_players <- data.table(
-  id = c('inf_1','inf_2'),
-  s = c('020711','030912'),
-  str = 1,
+  id = c('inf_1','inf_2','inf_3'),
+  s = c('020711','030912','010712'),
+  str = 0.8,
+  
   type = 'f'
 )
 
 
 e_target <- data.table(
-  id = c('inf_a'),
-  s = c('040810'),
+  id = c('inf_a','inf_b'),
+  s = c('050809','071211'),
   str = 1,
+  
   #sp = c('071009','081008'),
   type = 'e'
 )
@@ -475,26 +477,27 @@ i <- 0
 #trans<- list(i = 1,j = data.frame(2))
 
 
-while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 15) ){
+while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 20) ){
   print(i)
   
   if(i ==0) {
-    tgt_out <- e_target[,list(id,s,str,type)]
-    table_out <- rbind(f_players,tgt_out)
+    tgt_out <- e_target[,list(id,s,a = 'adj0',str,type)]
+    f_players_init <- f_players[,list(id,s,a = 'adj0',str,type)]
+    table_out <- rbind(f_players_init,tgt_out)
     table_out[,turn:=i]
   }
   
   #print(tgt_out)
-  ls1 <- search_par(f_players,3,50,.5,q_df_pos,tgt_out)
+  ls1 <- search_par(f_players,2,50,.5,q_df_pos,tgt_out)
   ls_eny <- search_par(tgt_out,1,20,.5,q_df_eny,f_players)
   
   
 
   ls1 <- ls1[r == max(r)][,list(r,s,a,sp,id)][,.SD[1],id]
   ls_eny <- ls_eny[r==max(r)][,list(r,s,a,sp,id)][,.SD[1],id]
-  #print(ls_eny)
-  ls1 <- f_players[ls1, on = 'id', list(s,a,sp,id,str)]
-  ls_eny <- e_target[ls_eny, on = 'id', list(s,a,sp,id,str)]
+  print(ls_eny)
+  ls1 <- ls1[f_players, on = 'id', list(s,a,sp,id,str)]
+  ls_eny <- ls_eny[e_target, on = 'id', list(s,a,sp,id,str)]
   print(ls1)
   print(ls_eny)
   
@@ -503,15 +506,15 @@ while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 15) ){
   #p_trans <- trans
   print(trans[[1]])
   print(trans[[2]])
-  f_players <- trans[[1]][,list(id,s=sp,str,type = "f")]
-  e_target <- trans[[2]][,list(id,s=sp,str,type = "e")]
+  f_players <- trans[[1]][,list(id,s=sp,a,str,type = "f")]
+  e_target <- trans[[2]][,list(id,s=sp,a,str,type = "e")]
   q_df_pos <- gradient_function(f_players$s,e_target$s)
   i <- i + 1
   
   f_players <- f_players[str>0.1]
   e_target <- e_target[str>0.1]
   
-  tgt_out <- e_target[,list(id,s,str,type)]
+  tgt_out <- e_target[,list(id,s,a,str,type)]
   table_out_temp <- rbind(f_players,tgt_out)
   table_out_temp[,turn := i]
   table_out <- rbind(table_out,table_out_temp)
@@ -520,7 +523,7 @@ while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 15) ){
 }
 
 
-
+write_csv(table_out,'test_3v2_24jan23.csv')
 ### Make sure the friendlies can't occupy the same square!!
 
 test <- data.table(s = c('123','345'),
