@@ -42,16 +42,16 @@ actions_samp <- function(players,adj) {
 
 
 
-reward_new <- function(trans){
+reward_new <- function(trans,grad){
   
   rew_conf <- 0
   
-  r <- sum(unique(trans[[3]][,list(s,r)])[trans[[1]], on = 's == sp']$r)
-  
+  r <- sum(unique(grad[,list(s,r)])[trans[[1]], on = 's == sp']$r)  #old one
+  #r <- nrow(trans[[1]])*-0.05  #For MCTS
  #target[,sp := s] # this command it to add sp column when calculating reward
                     #assumes the 'target' doesn't move.  may not work with actual calcs
 
-  if(trans[[4]] == TRUE){
+  if(trans[[3]] == TRUE){
     
     rconf <- reward_conf(trans)
     
@@ -69,6 +69,7 @@ reward_new <- function(trans){
 search_par <- function(state_init,depth=6,sims = 100,disc = 0.99,q_dft,target) {
 
   state_real <- state_init
+  microbenchmark::microbenchmark(actions(state_init$s,q_dft,10000))
   a_init <- actions(state_init$s,q_dft,10000)
   state_base <- colnames(a_init)
   
@@ -154,6 +155,7 @@ search_par <- function(state_init,depth=6,sims = 100,disc = 0.99,q_dft,target) {
 search_no_par <- function(state_init,depth=6,sims = 100,disc = 0.99,q_dft,target) {
   
   state_real <- state_init
+  
   a_init <- actions(state_init$s,q_dft,10000)
   state_base <- colnames(a_init)
   rew <- -Inf
@@ -225,8 +227,8 @@ search_no_par <- function(state_init,depth=6,sims = 100,disc = 0.99,q_dft,target
       if(rew_t > rew) {
         rew <- rew_t
         pol <- state_init[,list(id,s,a,sp)]
-        print(rew)
-        print(pol)
+        #print(rew)
+        #print(pol)
         
       }
     }
@@ -239,7 +241,7 @@ search_no_par <- function(state_init,depth=6,sims = 100,disc = 0.99,q_dft,target
 
 
 gradient_function <- function(players,target){
-  
+  print('grad!')
   hexdf3 <- hexdf2 %>% 
     #filter(x<=6 & y >= 8) %>%
     mutate(type = case_when(
@@ -284,7 +286,7 @@ gradient_function <- function(players,target){
 
 
 
-conf_check <- function(players,target,q_df){
+conf_check <- function(players,target){
   
   conf_all <- data.table(player=character(),target=character())
   
@@ -326,9 +328,9 @@ conf_check <- function(players,target,q_df){
   unique(conf_all)
 } 
 
-transition_function <- function(players,target,q_df,conf_all){
+transition_function <- function(players,target){
   
-  conf_all <- conf_check(players,target,q_df)
+  conf_all <- conf_check(players,target)
   
   if(nrow(conf_all)> 0){
     
@@ -342,14 +344,14 @@ transition_function <- function(players,target,q_df,conf_all){
     conf_out <- conflict(conf_all,players,target)
     
     players_conf <- players[conf_out[[1]], on = "id == player"]
-    players_conf[,c("str_old","str"):= .(str,str*mod)]
+    players_conf[,c("str_old","str"):= .(str,str-mod)]
     players_conf[,mod:= NULL]
     players_conf[,sp := s]
     
     players_out <- rbind(players_noconf,players_conf)
     
     target_conf <- target[conf_out[[2]], on = "id == target"]
-    target_conf[,c("str_old","str"):= .(str,str*mod)]
+    target_conf[,c("str_old","str"):= .(str,str-mod)]
     target_conf[,mod:= NULL]
     target_conf[,sp := s]
     target_out <- rbind(target_noconf,target_conf)
@@ -370,12 +372,12 @@ transition_function <- function(players,target,q_df,conf_all){
     
     if(nrow(target_out[str == 0])>0) {
       if(nrow(target_out[str>0]) == 0 ){
-        q_df$r <- 0
+        #q_df$r <- 0  #modifying for mcts test
       } else {
         print('transition grad')
         print(players_out[str>0])
         print(target_out[str>0])
-        q_df <- gradient_function(players_out[str>0]$s,target_out[str>0]$s)
+        #q_df <- gradient_function(players_out[str>0]$s,target_out[str>0]$s) # modifying for mcts test
       }
       
     }
@@ -391,7 +393,7 @@ transition_function <- function(players,target,q_df,conf_all){
     
   }
   
-  list(players_out,target_out,q_df,conf_occ,conf_all)
+  list(players_out,target_out,conf_occ,conf_all)
 
 }
 # 
@@ -437,21 +439,38 @@ transition_function <- function(players,target,q_df,conf_all){
 # fight_tbl[, by = target, .(mod = .85^(sum(atk_plr)/mean(atk_tgt)))]
 # 
 # 
+str(df2)
+
+numu <- 3
+posf <- df2 %>%
+  ungroup() %>%
+  filter(x_pos < 16) %>%
+  select(pos) %>%
+  sample_n(numu)
+
+pose <- df2 %>%
+  ungroup() %>%
+  filter(x_pos > 16) %>%
+  select(pos) %>%
+  sample_n(numu)
 
 
 
 f_players <- data.table(
-  id = c('inf_1','inf_2','inf_3'),
-  s = c('020711','030912','010712'),
-  str = 0.8,
+  id = paste0("inf_",1:numu),
+  #s = c('020711','030912'),
+  s = posf$pos,
+  str = 1,
   
   type = 'f'
 )
 
 
 e_target <- data.table(
-  id = c('inf_a','inf_b'),
-  s = c('050809','071211'),
+  #id = c('inf_a','inf_b'),
+  id = paste0("eny_",1:numu),
+  #s = c('050809','071211'),
+  s = pose$pos,
   str = 1,
   
   #sp = c('071009','081008'),
@@ -459,7 +478,7 @@ e_target <- data.table(
 )
 
 eny_obj <- '040810'
-
+#microbenchmark::microbenchmark(gradient_function(f_players$s,e_target$s))
 q_df_pos <- gradient_function(f_players$s,e_target$s)
 
 q_df_eny <- gradient_function(e_target$s,eny_obj)
@@ -486,21 +505,28 @@ while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 20) ){
     table_out <- rbind(f_players_init,tgt_out)
     table_out[,turn:=i]
   }
-  
+  #microbenchmark::microbenchmark(search_par(f_players,4,5,.75,q_df_pos,tgt_out))
   #print(tgt_out)
-  ls1 <- search_par(f_players,2,50,.5,q_df_pos,tgt_out)
-  ls_eny <- search_par(tgt_out,1,20,.5,q_df_eny,f_players)
+  #.count <- 0
+  #trace(transition_function, tracer=function() .count <<- .count +1)
   
   
-
+  ls1 <- search_par(f_players,4,5,.75,q_df_pos,tgt_out)
+  ls_eny <- search_par(tgt_out,2,2,.75,q_df_eny,f_players)
+  
+  
+  #print(ls1)
+  #print(ls_eny)
   ls1 <- ls1[r == max(r)][,list(r,s,a,sp,id)][,.SD[1],id]
   ls_eny <- ls_eny[r==max(r)][,list(r,s,a,sp,id)][,.SD[1],id]
   print(ls_eny)
   ls1 <- ls1[f_players, on = 'id', list(s,a,sp,id,str)]
   ls_eny <- ls_eny[e_target, on = 'id', list(s,a,sp,id,str)]
-  print(ls1)
-  print(ls_eny)
-  
+ # print(ls1)
+  ##print(ls_eny)
+
+  #print(.count)
+  #untrace(transition_function)
   trans <- transition_function(ls1,ls_eny,q_df_pos)
   
   #p_trans <- trans
@@ -523,7 +549,7 @@ while(i == 0 | (sum(f_players$str)>0 & sum(e_target$str) >0 & i < 20) ){
 }
 
 
-write_csv(table_out,'test_3v2_24jan23.csv')
+#write_csv(table_out,'data/test_20_25jan23.csv')
 ### Make sure the friendlies can't occupy the same square!!
 
 test <- data.table(s = c('123','345'),
