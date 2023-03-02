@@ -24,14 +24,73 @@ actions_samp <- function(players,adj) {
   
 }
 
-
-
-
-reward_new <- function(trans,grad){
+trunc_func <- function(val,floor=-3, ceiling = 3){
+  if(val > ceiling){
+    out <- ceiling
+  } else if (val < floor){
+    out <- floor
+  } else {
+    out <- round(val)
+  }
   
-  rew_conf <- 0
+  return(out)
+}
+
+trunc_func(-1.72)
+grad_func <- function(terr_df,unit_df){
+  #print(terr_df)
+  #print(terr_df_x)
+  # print(unit_df)
+  # print(terr_df)
+  # 
+  #v1 <- sapply(unit_df$lst[[1]], function(x) x - terr_df[[1]])
+  v1 <- unit_df$x_pos - terr_df[[1]]
+  v2 <- sapply(unit_df$lst[[2]], function(x) x - terr_df[[2]])
+  v2 <- unit_df$y_pos - terr_df[[2]]
+  # print('v1')
+  # print(v1)
+  # print('v2')
+  # print(v2)
+  unit_df$score <- unit_df$str / sqrt(v1^2 + v2^2) 
   
-  r <- sum(unique(grad[,list(s,r)])[trans[[1]], on = 's == sp']$r)  #old one
+  #print(unit_df)
+  # print(unit_df$score)
+  #out <- ifelse(sum(unit_df[type == 'f']$score) - sum(unit_df[type == 'e']$score) >= 0,1,-1)
+  out <- trunc_func(sum(unit_df[type == 'f']$score) - sum(unit_df[type == 'e']$score))
+  # df <- merge(rbind(trans[[1]],trans[[2]]),grad, by.y = 'pos',by.x = 's')
+  # 
+  # r <- c*sum(sapply(grad$lst, grad_func,unit_df = df))/nrow(grad)
+  #print(out)
+  return(out)
+}
+
+grad_reward <- function(trans,grad,c = 1){
+  
+  #print(rbind(trans[[1]],trans[[2]]))
+  
+  transout <- rbind(trans[[1]],trans[[2]])
+  #print('yo')
+  
+  df <- merge(transout,grad, by.y = 'pos',by.x = 's')
+  #print(df)
+  #print(df)
+  r <- c*sum(sapply(grad$lst, grad_func,unit_df = df))/nrow(grad)
+  #print(r)
+  return(r)
+}
+
+
+reward_new <- function(trans,grad,grad_reward,c = 1){
+  
+  r <- grad_reward
+  
+  #print(trans)
+  
+  #r <- sum(unique(grad[,list(s,r)])[trans[[1]], on = 's == sp']$r)  #old one
+  
+
+
+  #print(r)
   #r <- nrow(trans[[1]])*-0.05  #For MCTS
   #target[,sp := s] # this command it to add sp column when calculating reward
   #assumes the 'target' doesn't move.  may not work with actual calcs
@@ -85,7 +144,7 @@ gradient_function <- function(players,target){
       dist <- sqrt((q_df_pos[[i,5]]-tgts[[j,2]])^2 + (q_df_pos[[i,6]]-tgts[[j,3]])^2)
       
       if(dist > 0){
-        q_df_pos[[i,4]] <- q_df_pos[[i,4]] - (dist)/500
+        q_df_pos[[i,4]] <- 0#q_df_pos[[i,4]] - (dist)/500
       }
       
     }
@@ -183,9 +242,9 @@ transition_function <- function(players,target){
       if(nrow(target_out[str>0]) == 0 ){
         #q_df$r <- 0  #modifying for mcts test
       } else {
-        print('transition grad')
-        print(players_out[str>0])
-        print(target_out[str>0])
+        # print('transition grad')
+        # print(players_out[str>0])
+        # print(target_out[str>0])
         #q_df <- gradient_function(players_out[str>0]$s,target_out[str>0]$s) # modifying for mcts test
       }
       
@@ -211,5 +270,26 @@ transition_function <- function(players,target){
 
 utility_func <- function(q_lst, state_vec){
   s_ind <- which(sapply(q_lst$s,identical, y = state_vec))
+  #print(unlist(q_lst$q[s_ind]))
   return(max(unlist(q_lst$q[s_ind]))[1])
+}
+
+
+prob_setup <- function(samep = .3, adjp = .2125, adjbp = .075, backp = .025, stayp = 0.1){
+  
+  total <- samep + 2*adjp + 2*adjbp + backp + stayp
+  if(total != 1){
+    stop("Probability total not equal to 1")
+    
+  }
+  adj1_tbl <- data.table(a = c(rep('adj1',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,samep,adjp,adjbp,backp,adjbp,adjp))
+  adj2_tbl <- data.table(a = c(rep('adj2',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjp,samep,adjp,adjbp,backp,adjbp))
+  adj3_tbl <- data.table(a = c(rep('adj3',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjbp,adjp,samep,adjp,adjbp,backp))
+  adj4_tbl <- data.table(a = c(rep('adj4',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,backp,adjbp,adjp,samep,adjp,adjbp))
+  adj5_tbl <- data.table(a = c(rep('adj5',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjbp,backp,adjbp,adjp,samep,adjp))
+  adj6_tbl <- data.table(a = c(rep('adj6',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjp,adjbp,backp,adjbp,adjp,samep))
+  adj0_tbl <- data.table(a = c(rep('adj0',7)), nexta = c(paste0("adj",0:6)), p = c(1/7))
+  
+  prob_tran <- rbind(adj0_tbl,adj1_tbl,adj2_tbl,adj3_tbl,adj4_tbl,adj5_tbl,adj6_tbl)
+  return(prob_tran)
 }

@@ -147,7 +147,7 @@ terr1 <- c('201501','191401','191502','201602','191603')
 
 adj_df <- hexdf2 %>%
   ungroup() %>%
-  select(pos,x,y,z) %>%
+  select(pos,x,z,y) %>%
   distinct() %>%
   mutate(adj1 = paste0(ifelse(x<9,paste0(0,x+1),x+1),ifelse(z<10,paste0(0,z),z),ifelse(y<11,paste0(0,y-1),y-1)),
          adj2 = paste0(ifelse(x<9,paste0(0,x+1),x+1),ifelse(z<9,paste0(0,z+1),z+1),ifelse(y<10,paste0(0,y),y)),

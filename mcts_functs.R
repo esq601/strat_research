@@ -21,24 +21,24 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
   
   # Only current states are subsetted
   move <- actions[state, on = .(s)]
-  #  print(move)
-  # # print(actions)
+    # print(lasta)
+   #print(actions)
   #print(state)
   #print(lasta)
   
   lasta <- lasta[id %in% state$id]
-  #print('new lasta')
-  #print(lasta)
+  # print('new lasta')
+  #  print(lasta)
   actvec <- vector()
   for(i in 1:nrow(lasta)){
     #print(nrow(lasta))
     #print(lasta[[i,2]])
-    
+    #print(lasta)
     probs <- probdf[a == lasta[[i,2]]]
     availa <- actions[s == lasta[[i,1]]]
-    #print('here')
-    #print(probs)
-    #print(availa)
+    # print('here')
+    # print(i)
+    # print(availa)
     outtest <- probs[availa, on = c('nexta' = 'a')]
     #print('next here')
     outtest[, pnew := (p/sum(p))]
@@ -48,6 +48,7 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
     # if(length(act_select) > 1){
     #   print("bozooooooooo")
     # }
+    # print(act_select)
     
     actvec <- c(actvec,act_select)
     #print(probs)
@@ -66,7 +67,7 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
   #### uncommen these if this shit doesn't work
   movesel <- data.table(s = state$s, a = actvec, id = state$id)
   # print(movesel)
-  #print(movesel)
+  # print(movesel)
   
   move <- move[movesel, on = .(s,a,id)]
   #print(move)
@@ -75,7 +76,7 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
   move[type == 'e', a := 'adj0']
   move[type == 'e', sp := s]
   
-  # print(move)
+   # print(move)
   ### If a in (s,a) select max UCB
   matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(move[,list(id,s,str,type)]),
                                                      t(move[type=='f',list(a)]))))
@@ -92,13 +93,16 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
     matches_s <- which(matches_s)
     
     ucb <- (c*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
-    
+    #(5*sqrt(log(sum(c(1,2,4,5)))/c(1,2,4,5)))
     qsa <- unlist(q_lst$q[matches_s])
     #print(qsa)
     ucb <- ucb + qsa
     
-    
-    
+    # print(matches_s)
+    # print(ucb)
+    # print(matches_s[[which.max(ucb)]])
+    # print(move[,list(id,s,str,type)])
+    # print(q_lst$a[matches_s])
     movenew <- data.table(s = move[type == 'f']$s,str = move[type == 'f']$str,type = 'f',
                           id = move[type=='f']$id,
                            rand = move[type =='f']$rand)
@@ -131,9 +135,10 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
   }else{
     #print('else')
     type_act <- 'new'
+
     trans <- transition_function(move[type == 'f'],move[type == 'e'])
     
-    grad_rew <- grad_reward(trans, grad, c = .25)
+    grad_rew <- 0#grad_reward(trans, grad, c = .25)
     
     rew <- reward_new(trans,grad,grad_rew)
   }
@@ -238,7 +243,7 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
   return(list(q_lst,val,outnew,trigger))
 }
 
-simulate_mcts <- function(unit_obj, legal_a, terr_loc, q, c = 5, n_iter = 250, depth = 5){
+simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter = 250, depth = 5){
   
   avg_u <- 0
   bigval <- 0
@@ -262,17 +267,18 @@ simulate_mcts <- function(unit_obj, legal_a, terr_loc, q, c = 5, n_iter = 250, d
       #searchtime <- Sys.time()
       
       if(j == 0 ){
-        input_state <- data.table(s = units_new$s, a = "adj0",id = units_new$id)
+        input_state <- data.table(s = units_new$s, a = last_a,id = units_new$id)
         
       } else {
         
         input_state <- data.table(s = units_new$s, a = acts_new,id = units_new$id)
+        # print(input_state)
       }
       
       out <- execute_action(state=units_new,actions = legal_a,grad = terr_loc,q_lst=q,c=c, lasta = input_state, probdf = prob_tran)
       #searchtime <- Sys.time() - searchtime
       #print(paste("Search:",searchtime))
-      #print(out)
+      # print(out)
       #print('now q')
       df_type <- bind_rows(df_type,data.frame(iter = i, depth = j, type = out[[4]]))
       
@@ -280,7 +286,8 @@ simulate_mcts <- function(unit_obj, legal_a, terr_loc, q, c = 5, n_iter = 250, d
       
       lst_out <- append(lst_out,list(out))
       
-      
+      # print('out')
+      # print(out[[1]])
       units_new <- data.table(id = c(out[[1]]$id), s = c(out[[1]]$sp),
                               str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a))
       
@@ -290,6 +297,7 @@ simulate_mcts <- function(unit_obj, legal_a, terr_loc, q, c = 5, n_iter = 250, d
       new_len <- nrow(units_new)
 
       acts_new <- units_new$a
+      # print(acts_new)
       units_new[, a:= NULL]
       # if(old_len > new_len){
       #   print(units_new)
@@ -359,181 +367,3 @@ vec_add <- function(vector, add_vector){
   return(vector + add_vector)
 }
 
-#### start the thing
-
-
-
-numu <- 3
-nume <- 4
-
-posf <- df2 %>%
-  ungroup() %>%
-  filter(x_pos < 16) %>%
-  select(pos) %>%
-  sample_n(numu)
-
-pose <- df2 %>%
-  ungroup() %>%
-  filter(x_pos > 16) %>%
-  select(pos) %>%
-  sample_n(nume)
-
-
-
-f_players <- data.table(
-  id = paste0("inf_",1:numu),
-  s = c('020711','030609','050506'),
-  #s = posf$pos,
-  str = 100,
-  
-  type = 'f'
-)
-
-
-e_target <- data.table(
-  #id = c('inf_a','inf_b'),
-  id = paste0("eny_",1:nume),
-  s = c('050809','071211','070706','061010'),
-  #s = pose$pos,
-  str = 100,
-  
-  #sp = c('071009','081008'),
-  type = 'e'
-)
-
-
-
-legal_acts <- data.table(adj_df)
-legal_acts[,param := list(c(1,1))]
-
-legal_acts
-units <- rbind(f_players,e_target)
-
-units
-unit_trans <- list(units[type=='f'],units[type == 'e'])
-
-units_log <- data.table()
-turn <- 0
-
-actions <- c(paste0("adj",0:6))
-
-
-selected_a <- sample(actions, nrow(units[type=='f']))
-
-territory <- data.table(df2[,c('pos','x_pos','y_pos')])
-territory[,lst := Map(list,x_pos,y_pos)]
-unit_trans[[2]]
-rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
-
-q_work <- list(s = list(as.vector(t(units))), a = list(selected_a),
-          sa = list(as.vector(c(t(units),t(selected_a)))), q = list(0), n =list(1), grad_rew = rew_start)
-
-
-
-#out <- simulate_mcts(units,legal_acts,territory, q_work,c = 5, n_iter = 2000, depth = 6)
-
-
-#q_work <- out[[1]]
-while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
-  
-  legal_acts <- data.table(adj_df)
-  legal_acts[,param := list(c(1,1))]
-  print(turn)
-  print(length(q_work$sa))
-
-  # selected_a <- sample(actions, nrow(units[type=='f']))
-  # 
-  # q <- list(s = list(as.vector(t(units))), a = list(selected_a),
-  #           sa = list(as.vector(c(t(units),t(selected_a)))), q = list(0), n =list(1))
-  # 
-  #grad_out <- gradient_function(units[type == 'f']$s,units[type == 'e']$s)
-  if(turn > 0){
-    keep_val <- which(unlist(q_work$q) > quantile(unlist(q_work$q),.75))
-    
-    q_work$s <- q_work$s[keep_val]
-    q_work$a <- q_work$a[keep_val]
-    q_work$sa <- q_work$sa[keep_val]
-    q_work$q <- q_work$q[keep_val]
-    q_work$n <- q_work$n[keep_val]
-    q_work$grad_rew <- q_work$grad_rew[keep_val]
-  }
-  
-  # 
-  # 
-  print(length(q_work$sa))
-  
-  out <- simulate_mcts(units,legal_acts,territory, q_work,c = 50, n_iter = 1000, depth = 8)
-  q_work <- out[[1]]
-  
-  #out[[2]][order(-q)][[1,2]]
-  #rep('adj0',nrow(units[type == 'e']))
-  
-  
-  units[,a :=c(out[[2]][order(-q)][[1,2]],rep('adj0',nrow(units[type == 'e']))) ]
-  
-  move <- legal_acts[units, on = .(s,a)]
-  print(move)
-  move[,param := NULL]
-  trans <- transition_function(move[type == 'f'],move[type == 'e'])
-  print(trans)
-  print(out[[2]])
-  
-  
-  units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
-  units <- units[str>10]
-  #print(units)
-  turn <- turn + 1
-  units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_28feb.csv')
-  
-}
-
-
-
-test <- sapply(q_work$sa,paste,collapse=" ")
-
-df <- data.frame(x = test, q = unlist(q_work$q), n = unlist(q_work$n), r = unlist(q_work$grad_rew), s = sapply(q_work$s,paste,collapse=" "))
-
-all(c(T,T,T))
-str(df)
-identical(df$s,sample(df$s,1))
-
-
-
-valtest <- sample(df$s,1)
-
-df$match <- sapply(df$s,matchfun, new = valtest)
-
-df %>%
-  filter(match == TRUE) %>%
-  select(x,q,n,r)
-
-ggplot(df, aes(x = r, y = q)) +
-  geom_point()
-
-length(test)
-ength(unique(test))
-
-### Find starting state
-
-out_test <- out
-
-keep_val <- which(unlist(out_test[[1]]$q) > quantile(unlist(out_test[[1]]$q),.75))
-
-testlst <- out_test[[1]]$q[keep_val]
-
-
-
-### explore exploit examine
-
-expexp <- out[[3]]
-
-
-expexp2 <- expexp %>%
-  mutate(turn = row_number()) %>%
-  group_by(depth,type) %>%
-  mutate(number_seen = row_number())
-
-ggplot(expexp2) +
-  geom_point(aes(x = turn, y = number_seen, color = type)) +
-  facet_wrap(~depth)

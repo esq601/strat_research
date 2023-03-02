@@ -8,7 +8,7 @@ table_out <- data.table(read_csv("out_table2023-01-24.csv"))
 70-28
 42/3
 
-write_csv(units_log, 'mcts_test_03feb.csv')
+write_csv(units_log, 'mcts_test_27feb.csv')
 table_out <- units_log
 
 hexdt <- data.table(hexdf2)[,s := pos]
@@ -26,7 +26,7 @@ adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
 pieces <- adj_dt[pieces, on = .(a)]
 
 ### testing spoke
-pnew <- pieces[turn == 4]
+pnew <- pieces[turn == 1]
 pnew
 ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = 'transparent') +
@@ -69,7 +69,7 @@ animate(p1)
 
 
 animate(p1, height = 8, width = 10,fps = 10,duration = 20, units = "in", res = 120)
-anim_save('images/test_fight_mcts1.gif')
+anim_save('images/test_fight_mcts4.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]
