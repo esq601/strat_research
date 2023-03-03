@@ -237,18 +237,7 @@ transition_function <- function(players,target){
       players_out[sp %in% target_out$sp]$sp <- players_out[sp %in% target_out$sp]$s
       
     }
-    
-    if(nrow(target_out[str == 0])>0) {
-      if(nrow(target_out[str>0]) == 0 ){
-        #q_df$r <- 0  #modifying for mcts test
-      } else {
-        # print('transition grad')
-        # print(players_out[str>0])
-        # print(target_out[str>0])
-        #q_df <- gradient_function(players_out[str>0]$s,target_out[str>0]$s) # modifying for mcts test
-      }
-      
-    }
+
     
   } else {
     conf_occ <- FALSE
@@ -260,8 +249,7 @@ transition_function <- function(players,target){
     target_out[,str_old := str]
     
   }
-  players_out[order(-id)]
-  target_out[order(id)]
+  
   list(players_out,target_out,conf_occ,conf_all)
   
 }
@@ -269,7 +257,8 @@ transition_function <- function(players,target){
 
 
 utility_func <- function(q_lst, state_vec){
-  s_ind <- which(sapply(q_lst$s,identical, y = state_vec))
+  s_ind <- which(q_lst$s$s %in% state_vec)
+  #print(s_ind)
   #print(unlist(q_lst$q[s_ind]))
   return(max(unlist(q_lst$q[s_ind]))[1])
 }

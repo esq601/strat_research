@@ -11,129 +11,83 @@ yes_fun <- function(vector){
   rbeta(n = 1, shape1 = vector[[1]], shape2 = vector[[2]])
 }
 
-
-
-
-execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
-  
-  #q_list <- 
-  ### Sample a
+execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, disc = 0.95) {
   
   # Only current states are subsetted
-  move <- actions[state, on = .(s)]
-    # print(lasta)
-   #print(actions)
-  #print(state)
-  #print(lasta)
   
+  
+  move <- actions[state, on = .(s)]
   lasta <- lasta[id %in% state$id]
-  # print('new lasta')
-  #  print(lasta)
   actvec <- vector()
+  
   for(i in 1:nrow(lasta)){
-    #print(nrow(lasta))
-    #print(lasta[[i,2]])
-    #print(lasta)
+    
     probs <- probdf[a == lasta[[i,2]]]
     availa <- actions[s == lasta[[i,1]]]
-    # print('here')
-    # print(i)
-    # print(availa)
     outtest <- probs[availa, on = c('nexta' = 'a')]
-    #print('next here')
+    
     outtest[, pnew := (p/sum(p))]
-    #print(outtest)
+    
     act_select <- outtest[sample(length(outtest$pnew), size = 1, prob = outtest$pnew)][[2]]
-    #print(act_select)
-    # if(length(act_select) > 1){
-    #   print("bozooooooooo")
-    # }
-    # print(act_select)
-    
     actvec <- c(actvec,act_select)
-    #print(probs)
-    #print(act_select)
     
-    # print(actions[s == lasta[[i,1]] & a == lasta[[i,2]]])
   }
   
-  #### taking out the update stuff to test directional sampling
-  # Sample from beta distribution
-  #move$rand <- sapply(move$param, yes_fun)
-  # print(actvec)
-  #Select a with maximum sample
-  #move <- move[, .SD[which.max(rand)], by = id]
-  
-  #### uncommen these if this shit doesn't work
   movesel <- data.table(s = state$s, a = actvec, id = state$id)
-  # print(movesel)
-  # print(movesel)
   
   move <- move[movesel, on = .(s,a,id)]
-  #print(move)
-  #move$a <- actvec
   
   move[type == 'e', a := 'adj0']
   move[type == 'e', sp := s]
   
-   # print(move)
-  ### If a in (s,a) select max UCB
-  matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(move[,list(id,s,str,type)]),
-                                                     t(move[type=='f',list(a)]))))
+  s_vec <- paste0(t(move[,list(id,s,str,type)]),collapse = '')
+  sa_vec <- paste0(paste0(t(move[,list(id,s,str,type)]),collapse = ''),
+                   paste0(t(move[type=='f',list(a)]),collapse = ''),
+                   collapse = '')
   
+  
+  ### If a in (s,a) select max UCB
+  # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(move[,list(id,s,str,type)]),
+  #                                                    t(move[type=='f',list(a)]))))
+  matches <- q_lst$sa$sa %in% sa_vec
   ### Count and index the matches of (s,a)
   outnew <- which(matches, arr.ind = FALSE)
   
   ### If there is no match, initiate counter and set Q=r
   if(length(outnew) > 0) {
-    #print(outnew)
     
-    matches_s <- sapply(q_lst$s,matchfun, new = as.vector(t(state[,list(id,s,str,type)])))
+    matches_s <- q_lst$s$s %in% s_vec
     
     matches_s <- which(matches_s)
     
-    ucb <- (c*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
-    #(5*sqrt(log(sum(c(1,2,4,5)))/c(1,2,4,5)))
+    ucb <- ((c*(disc^depth))*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
+    
     qsa <- unlist(q_lst$q[matches_s])
-    #print(qsa)
+    
     ucb <- ucb + qsa
     
-    # print(matches_s)
-    # print(ucb)
-    # print(matches_s[[which.max(ucb)]])
-    # print(move[,list(id,s,str,type)])
-    # print(q_lst$a[matches_s])
     movenew <- data.table(s = move[type == 'f']$s,str = move[type == 'f']$str,type = 'f',
                           id = move[type=='f']$id,
                            rand = move[type =='f']$rand)
     movenew$a <- q_lst$a[matches_s[[which.max(ucb)]]]
-    # print(ucb)
-    # print(matches_s[[which.max(ucb)]])
-    # print(q_lst$sa[matches_s[[which.max(ucb)]]])
-    # print(matches_s)
-    # print('here')
-    # print(movenew)
+    
     if(which.max(ucb) == which.max(qsa)){
-      #print("Exploit!!!")
+      
       type_act <- 'exploit'
     } else {
-      #print('explore')
+      
       type_act <- 'explore'
     }
     
-    # print(movenew)
-    movenew <- actions[movenew, on = .(s,a)]#move[type == 'f', a := q_lst$a[which.max(ucb)]]
-    #print(movenew)
-    #print(move)
+    movenew <- actions[movenew, on = .(s,a)]
+    
     trans <- transition_function(movenew,move[type == 'e'])
-    #print(trans)
+    
     grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
-    #print('yooo')
-    #print(grad_rew)
     
     rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
   }else{
-    #print('else')
+    
     type_act <- 'new'
 
     trans <- transition_function(move[type == 'f'],move[type == 'e'])
@@ -142,12 +96,6 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf) {
     
     rew <- reward_new(trans,grad,grad_rew)
   }
-
-  # if(identical(as.vector(t(units[type=='f',list(id,s,str,type)])) , as.vector(t(trans[[1]][,list(id,s,str,type)])) )==FALSE) {
-  #   rew <- reward_new(trans,grad, c = 5)
-  # }
-  # 
-  # rew <- reward_new(trans,grad, c = 5)
   
   return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act))
   
@@ -159,87 +107,59 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
   trigger <- F
   
   transition[[1]][order(id)]
-  matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
-                                                         t(transition[[1]][type=='f',list(a)]))))
   
+  s_old_vec <- paste0(t(transition[[1]][,list(id,s,str_old,type)]),collapse = '')
+  
+  s_vec <- paste0(t(transition[[1]][,list(id,sp,str,type)]),collapse = '')
+  
+  sa_vec <- paste0(paste0(t(transition[[1]][,list(id,s,str_old,type)]),collapse = ''),
+                   paste0(t(transition[[1]][type=='f',list(a)]),collapse = ''),
+                   collapse = '')
+  
+  # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
+  #                                                        t(transition[[1]][type=='f',list(a)]))))
+  matches <- q_lst$sa$sa %in% sa_vec
   ### Count and index the matches of (s,a)
   outnew <- which(matches, arr.ind = FALSE)
-  #print(outnew)
   
   val <- transition[[2]]
-  # if(val > 30){
-  #   print(c('outnew',outnew,val))
-  # }
   
   ### If there is no match, initiate counter and set Q=r
-  if(length(outnew) == 0) {
-    #print('here')
-    #print(outnew)
-    q_lst$s <- append(q_lst$s,list(as.vector(t(transition[[1]][,list(id,s,str_old,type)]))))
+  if(transition[[4]] == 'new') {
+    
+    q_lst$s <- rbind(q_lst$s,data.table(s = s_old_vec))
     q_lst$a <- append(q_lst$a,list(as.vector(t(transition[[1]][type=='f',list(a)]))))
-    q_lst$sa <- append(q_lst$sa,list(as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
-                                                 t(transition[[1]][type=='f',list(a)])))))
+    q_lst$sa <- rbind(q_lst$sa,data.table(sa = sa_vec))
     q_lst$q <- append(q_lst$q,list(val))
     q_lst$n <- append(q_lst$n,list(1))
     q_lst$grad_rew <- append(q_lst$grad_rew,transition[[2]])
-    #print(transition[[2]])
+    
   } 
   ### Else, add the reward to U(s') and increment N(s,a)
-  #else {
-  #print('down here now')
-  # Check if next state exists
-  #print(transition[[3]])
-  #print(outnew)
-  matches_s <- sapply(q_lst$s,matchfun, new = as.vector(t(transition[[1]][,list(id,sp,str,type)])))
   
-  #print(as.vector(t(transition[[1]][,list(id,s,str_old,type)])))
-  #print(as.vector(t(transition[[1]][,list(id,sp,str,type)])))
+  matches_s <- q_lst$s$s %in% s_vec
   
   next_state <- which(matches_s, arr.ind = FALSE)
-  #print(c('nextstate',next_state))
   
-  #print(as.vector(t(transition[[1]][,list(id,sp,str,type)])))
   # If next state does not exist
   if(length(next_state) > 0){
-    #print(length(q_lst$n))
-    #print('match!').
-    matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
-                                                           t(transition[[1]][type=='f',list(a)]))))
+    
+    # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
+    #                                                        t(transition[[1]][type=='f',list(a)]))))
+    
+    matches <-  q_lst$sa$sa %in% sa_vec
     outnew <- which(matches, arr.ind = FALSE)
     
-    #print(c('outnew',outnew))
-    # val <- q_lst$grad_rew[outnew]
-    # print(val)
-    u_ind <- utility_func(q_lst, as.vector(t(transition[[1]][,list(id,sp,str,type)])))
-    
-    #print(c('utility',u_ind,'reward',val,'n',q_lst$n[[outnew]]))
+    u_ind <- utility_func(q_lst, s_vec)
     
     q_lst$n[outnew] <- list(q_lst$n[[outnew]]+1)
     
-    #print(c('oldq',q_lst$q[[outnew]],'newq',(val + gamma * u_ind)))
-    
-    
-    #### Testing out using the max q value for the update
-    #val <- q_lst$q[[outnew]] + ((((val + gamma * u_ind)-q_lst$q[[outnew]])) / q_lst$n[[outnew]])
-    #print(val)
     val <- (val + gamma^j * u_ind)
     
     q_lst$q[outnew] <- list(val)
-    # if(val > 30){
-    #   
-    #   trigger <- T
-    #   print(c('old val',val))
-    #   
-    #   print(c('new val',val_new))
-    #   print(c('index',outnew, 'q_value',q_lst$q[outnew]))
-    #   
-    # }
-    #print(c('updated q',val))
-    
-
-    
     
   } 
+  
   return(list(q_lst,val,outnew,trigger))
 }
 
@@ -264,7 +184,6 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
     }
     
     while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
-      #searchtime <- Sys.time()
       
       if(j == 0 ){
         input_state <- data.table(s = units_new$s, a = last_a,id = units_new$id)
@@ -272,67 +191,41 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
       } else {
         
         input_state <- data.table(s = units_new$s, a = acts_new,id = units_new$id)
-        # print(input_state)
+        
       }
       
-      out <- execute_action(state=units_new,actions = legal_a,grad = terr_loc,q_lst=q,c=c, lasta = input_state, probdf = prob_tran)
-      #searchtime <- Sys.time() - searchtime
-      #print(paste("Search:",searchtime))
-      # print(out)
-      #print('now q')
-      df_type <- bind_rows(df_type,data.frame(iter = i, depth = j, type = out[[4]]))
+      out <- execute_action(state=units_new,actions = legal_a,grad = terr_loc,
+                            q_lst=q,c=c, lasta = input_state,
+                            probdf = prob_tran, depth = j, disc = 0.95)
       
-      #print(out)
+      df_type <- bind_rows(df_type,data.frame(iter = i, depth = j, type = out[[4]]))
       
       lst_out <- append(lst_out,list(out))
       
-      # print('out')
-      # print(out[[1]])
       units_new <- data.table(id = c(out[[1]]$id), s = c(out[[1]]$sp),
                               str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a))
       
-      #print(units_new)
       old_len <- nrow(units_new)
       units_new <- units_new[str > 10]
       new_len <- nrow(units_new)
 
       acts_new <- units_new$a
-      # print(acts_new)
+      
       units_new[, a:= NULL]
-      # if(old_len > new_len){
-      #   print(units_new)
-      # }
-      #print(units_new)
+      
       j <- j + 1
       
       
       
     }
-
-    
-    #searchtime <- Sys.time()
-    
     
     for(k in length(lst_out):1){
-      #print(k)
+      
       q_temp <- q_update(q,lst_out[[k]], gamma = 0.95, j = k)
       
       q <- q_temp[[1]]
       
-      # if(q_temp[[4]] == TRUE){
-      #   
-      #   bigval <- q_temp[[3]]
-      #   print(c('out qtemp',bigval,"out q",q$q[[bigval]]))
-      # }
-      
     }
-    
-    # if(bigval > 0){
-    #   print(c('outside qtemp',bigval,"outside q",q$q[[bigval]]))
-    # }
-    
-    #searchtime <- Sys.time() - searchtime
-    #print(paste("Update:",searchtime))
     
     val <- unlist(q_temp[[2]])
     val[is.null(val)] <- 0
@@ -349,17 +242,18 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
     
     
   }
+  #print(unit_obj)
+  s_vec <- paste0(t(unit_obj[,list(id,s,str,type)]),collapse = '')
   
-  # if(bigval > 0){
-  #   print(c('outside final qtemp',bigval,"outside final q",q$q[[bigval]]))
-  # }
-
+  state_in <- q$s$s %in% s_vec
+  #print(q$s$s[1:100])
+  #state_in <- sapply(q$s,matchfun, new = as.vector(t(unit_obj[,list(id,s,str,type)])))
   
-  state_in <- sapply(q$s,matchfun, new = as.vector(t(unit_obj[,list(id,s,str,type)])))
   
-  lst_new <- data.table(q = unlist(q$q[which(state_in)]), a = (q$a[which(state_in)]),sp = (q$sp[which(state_in)]))
+  
+  lst_new <- data.table(q = unlist(q$q[which(state_in)]), a = (q$a[which(state_in)]))
   lst_new[order(-q)]
-  #print(lst_new)
+  
   return(list(q,lst_new,df_type))
 }
 

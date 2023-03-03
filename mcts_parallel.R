@@ -68,8 +68,8 @@ territory[,lst := Map(list,x_pos,y_pos)]
 unit_trans[[2]]
 rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
 
-q_work <- list(s = list(as.vector(t(units))), a = rep('adj0',nrow(units[type=='f'])),
-               sa = list(as.vector(c(t(units),rep('adj0',nrow(units[type=='f']))))), 
+q_work <- list(s = data.table(s = paste0(t(units),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
+               sa = data.table(s = paste0(paste0(t(units),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
                q = list(0), n =list(1), grad_rew = 0)#rew_start)
 
 

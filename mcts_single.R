@@ -41,8 +41,6 @@ e_target <- data.table(
   type = 'e'
 )
 
-
-
 legal_acts <- data.table(adj_df)
 legal_acts[,param := list(c(1,1))]
 
@@ -65,8 +63,22 @@ territory[,lst := Map(list,x_pos,y_pos)]
 unit_trans[[2]]
 rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
 
-q_work <- list(s = list(as.vector(t(units))), a = list(selected_a),
-               sa = list(as.vector(c(t(units),t(selected_a)))), q = list(0), n =list(1), grad_rew = 0)#rew_start)
+q_work <- list(s = data.table(s = paste0(t(units),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
+               sa = data.table(sa = paste0(paste0(t(units),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
+               q = list(0), n =list(1), grad_rew = 0)#rew_start)
+
+
+q_work
+sim_change <- 1
+
+
+
+selected_a <- c(rep('adj2',nrow(units[type == 'f'])), rep('adj0',nrow(units[type == 'e'])))
+
+
+
+# q_work <- list(s = list(as.vector(t(units))), a = list(selected_a),
+#                sa = list(as.vector(c(t(units),t(selected_a)))), q = list(0), n =list(1), grad_rew = 0)#rew_start)
 
 
 q_work
@@ -81,11 +93,15 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   print(turn)
   print(length(q_work$sa))
   
-  print(length(q_work$sa))
+  print(nrow(q_work$sa))
   
-  out <- simulate_mcts(units,legal_acts,territory, q_work,c = 75, n_iter = 500, depth = 6)
+  #units[,a := NULL]
+  out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
+                       q=q_work,c = 40*nrow(units[type == 'f']),
+                       n_iter = sim_change*2000, depth = 6)
+  
   q_work <- out[[1]]
-  
+  out[[2]]
   #out[[2]][order(-q)][[1,2]]
   #rep('adj0',nrow(units[type == 'e']))
   
@@ -99,27 +115,24 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   print(trans)
   print(out[[2]])
   
-  
+  selected_a <- c(trans[[1]][str>10 & order(id)]$a,trans[[2]][str>10 & order(id)]$a)
   units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
   units <- units[str>10]
   #print(units)
+  
+  
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_01mar.csv')
+  write_csv(units_log, 'mcts_test_02mar.csv')
   
 }
 
 
-
-test <- sapply(q_work$sa,paste,collapse=" ")
-
-df <- data.frame(x = test, q = unlist(q_work$q), n = unlist(q_work$n), r = unlist(q_work$grad_rew), s = sapply(q_work$s,paste,collapse=" "))
-
-all(c(T,T,T))
-str(df)
-identical(df$s,sample(df$s,1))
-
 View(out[[2]])
+
+saveRDS(out,'mcts_test_o2mar.rds')
+
+
 View(data.frame(x = unlist(out[[1]]$q)))
 
 valtest <- sample(df$s,1)
