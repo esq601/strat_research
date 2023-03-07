@@ -98,7 +98,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   #units[,a := NULL]
   out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
                        q=q_work,c = 40*nrow(units[type == 'f']),
-                       n_iter = sim_change*2000, depth = 6)
+                       n_iter = sim_change*500, depth = 6)
   
   q_work <- out[[1]]
   out[[2]]
@@ -123,14 +123,14 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_02mar.csv')
+  write_csv(units_log, 'mcts_test_06mar.csv')
   
 }
 
 
 View(out[[2]])
 
-saveRDS(out,'mcts_test_o2mar.rds')
+saveRDS(out,'mcts_test_o6mar.rds')
 
 
 View(data.frame(x = unlist(out[[1]]$q)))
@@ -170,5 +170,15 @@ expexp2 <- expexp %>%
   mutate(number_seen = row_number())
 
 ggplot(expexp2) +
-  geom_point(aes(x = turn, y = number_seen, color = type)) +
-  facet_wrap(~depth)
+  geom_point(aes(x = iter, y = number_seen, color = type)) +
+  facet_wrap(~depth) +
+  ggsci::scale_color_lancet() +
+  theme_minimal() +
+  labs(
+    y = "Count",
+    x = "Simulation",
+    color = "Action",
+    title = "Sample MCTS Search for Tactical Action",
+    subtitle = "Subgraph at each depth of search."
+  )
+ggsave('images/mctsexample.jpeg',height = 6, width = 8, dpi = 320)

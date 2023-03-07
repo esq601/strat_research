@@ -68,8 +68,8 @@ animate(p1)
 
 
 
-animate(p1, height = 8, width = 10,fps = 10,duration = 20, units = "in", res = 120)
-anim_save('images/test_fight_mcts5.gif')
+animate(p1, height = 8, width = 10,fps = 10,duration = 30, units = "in", res = 120)
+anim_save('images/test_fight_mcts6.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]
