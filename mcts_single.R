@@ -4,7 +4,7 @@ source('mcts_functs.R')
 
 
 numu <- 3
-nume <- 4
+nume <- 1
 
 posf <- df2 %>%
   ungroup() %>%
@@ -33,7 +33,7 @@ f_players <- data.table(
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
   id = paste0("eny_",1:nume),
-  s = c('050809','071211','070706','061010'),
+  s = '171302',#c('050809','071211','070706','061010'),
   #s = pose$pos,
   str = 100,
   
@@ -98,7 +98,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   #units[,a := NULL]
   out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
                        q=q_work,c = 40*nrow(units[type == 'f']),
-                       n_iter = sim_change*500, depth = 6)
+                       n_iter = sim_change*500, depth = 15)
   
   q_work <- out[[1]]
   out[[2]]
@@ -123,7 +123,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_06mar.csv')
+  #write_csv(units_log, 'mcts_test_06mar.csv')
   
 }
 
@@ -182,3 +182,14 @@ ggplot(expexp2) +
     subtitle = "Subgraph at each depth of search."
   )
 ggsave('images/mctsexample.jpeg',height = 6, width = 8, dpi = 320)
+
+
+
+
+#### look at logs
+
+df <- out[[4]]
+
+summary(out[[4]])
+
+sum(sum(df$init),sum(df$ifs))

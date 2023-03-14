@@ -11,27 +11,52 @@ yes_fun <- function(vector){
   rbeta(n = 1, shape1 = vector[[1]], shape2 = vector[[2]])
 }
 
+select_fun <- function(state,action,legal_moves, prob_df){
+  #print(action)
+  #print(state)
+  dfmove <- prob_df[a == action & nexta %in% legal_moves[s == state]$a]
+  #print(dfmove)
+  sample(dfmove$nexta, size =1 , prob = dfmove$p)
+}
+
+
+
 execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, disc = 0.95) {
   
   # Only current states are subsetted
   
-  
+  t1 <- Sys.time()
+  # print(lasta)
+  # print(state)
   move <- actions[state, on = .(s)]
-  lasta <- lasta[id %in% state$id]
+  # print(move)
+  #lasta <- lasta[id %in% state$id]
   actvec <- vector()
-  
+  # print(probdf)
+  # probdf <- merge(probdf,move, by = 'a')
+  # print(probdf)
+  #print(lasta)
   for(i in 1:nrow(lasta)){
     
-    probs <- probdf[a == lasta[[i,2]]]
-    availa <- actions[s == lasta[[i,1]]]
-    outtest <- probs[availa, on = c('nexta' = 'a')]
     
-    outtest[, pnew := (p/sum(p))]
     
-    act_select <- outtest[sample(length(outtest$pnew), size = 1, prob = outtest$pnew)][[2]]
+    # probs <- probdf[a == lasta[[i,2]]]
+    # availa <- actions[s == lasta[[i,1]]]
+    # outtest <- probs[availa, on = c('nexta' = 'a')]
+    # 
+    # outtest[, pnew := (p/sum(p))]
+    
+    #act_select <- probdf[sample(1:7, size = 1,prob = probdf[a == lasta[[i,2]]]$p),2][[1]]
+    act_select <- select_fun(lasta[[i,1]],lasta[[i,2]],actions,probdf)
+    
     actvec <- c(actvec,act_select)
-    
   }
+  
+  #print(actvec)
+  
+  
+  td1 <- Sys.time() - t1
+  t2 <- Sys.time()
   
   movesel <- data.table(s = state$s, a = actvec, id = state$id)
   
@@ -52,6 +77,8 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, dis
   matches <- q_lst$sa$sa %in% sa_vec
   ### Count and index the matches of (s,a)
   outnew <- which(matches, arr.ind = FALSE)
+  
+
   
   ### If there is no match, initiate counter and set Q=r
   if(length(outnew) > 0) {
@@ -86,6 +113,9 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, dis
     grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
     
     rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    
+    td2 <- Sys.time() - t2
+    typeout <- 'update'
   }else{
     
     type_act <- 'new'
@@ -95,9 +125,12 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, dis
     grad_rew <- 0#grad_reward(trans, grad, c = .25)
     
     rew <- reward_new(trans,grad,grad_rew)
+    td2 <- Sys.time() - t2
+    typeout <- 'new'
   }
   
-  return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act))
+  dtout <- data.table(init = td1, ifs = td2, type = typeout)
+  return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act,dtout))
   
 }
 
@@ -170,6 +203,8 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
   df_type <- data.frame()
   prob_tran <- prob_setup()
   time_stamp <- Sys.time()
+  
+  df_log <- data.table()
   for(i in 1:n_iter){
     units_new <- unit_obj
     
@@ -194,9 +229,14 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
         
       }
       
+      
+      time <- Sys.time()
       out <- execute_action(state=units_new,actions = legal_a,grad = terr_loc,
                             q_lst=q,c=c, lasta = input_state,
                             probdf = prob_tran, depth = j, disc = 0.95)
+      
+      df_log <- rbind(df_log,out[[5]])
+      #print(c("Time Execute", Sys.time()-time))
       
       df_type <- bind_rows(df_type,data.frame(iter = i, depth = j, type = out[[4]]))
       
@@ -230,15 +270,15 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
     val <- unlist(q_temp[[2]])
     val[is.null(val)] <- 0
     
-    avg_u <- avg_u + (val-avg_u)/i
+    # avg_u <- avg_u + (val-avg_u)/i
     
-    if(val > avg_u) {
-      legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
-              param := list(lapply(param,vec_add,add_vector = c(.01,0) ))]
-    } else {
-      legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
-              param := list(lapply(param,vec_add,add_vector =  c(0,.01) ))]
-    }
+    # if(val > avg_u) {
+    #   legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
+    #           param := list(lapply(param,vec_add,add_vector = c(.01,0) ))]
+    # } else {
+    #   legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
+    #           param := list(lapply(param,vec_add,add_vector =  c(0,.01) ))]
+    # }
     
     
   }
@@ -254,8 +294,9 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5, n_iter =
   lst_new <- data.table(q = unlist(q$q[which(state_in)]), a = (q$a[which(state_in)]))
   lst_new[order(-q)]
   
-  return(list(q,lst_new,df_type))
+  return(list(q,lst_new,df_type,df_log))
 }
+
 
 vec_add <- function(vector, add_vector){
   return(vector + add_vector)

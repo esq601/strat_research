@@ -198,9 +198,14 @@ conf_check <- function(players,target){
 
 transition_function <- function(players,target){
   
-  conf_all <- conf_check(players,target)
-  
-  if(nrow(conf_all)> 0){
+  if(
+    any(
+      players$sp %in% target$sp,
+      players$s %in% target$sp & players$sp %in% target$s
+    ) == TRUE
+  ) {
+    conf_all <- conf_check(players,target)
+    
     
     conf_occ <- TRUE
     players_noconf <- players[!(id %in% conf_all$player)]
@@ -236,11 +241,10 @@ transition_function <- function(players,target){
       #print('broken')
       players_out[sp %in% target_out$sp]$sp <- players_out[sp %in% target_out$sp]$s
       
-    }
-
-    
+    } 
   } else {
     conf_occ <- FALSE
+    conf_all <- data.table()
     
     players_out <- players[!(id %in% conf_all$player)]
     players_out[,str_old := str]
@@ -282,3 +286,5 @@ prob_setup <- function(samep = .3, adjp = .2125, adjbp = .075, backp = .025, sta
   prob_tran <- rbind(adj0_tbl,adj1_tbl,adj2_tbl,adj3_tbl,adj4_tbl,adj5_tbl,adj6_tbl)
   return(prob_tran)
 }
+
+
