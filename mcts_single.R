@@ -4,7 +4,7 @@ source('mcts_functs.R')
 
 
 numu <- 3
-nume <- 1
+nume <- 4
 
 posf <- df2 %>%
   ungroup() %>%
@@ -33,7 +33,7 @@ f_players <- data.table(
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
   id = paste0("eny_",1:nume),
-  s = '171302',#c('050809','071211','070706','061010'),
+  s = c('050809','071211','070706','061010'),
   #s = pose$pos,
   str = 100,
   
@@ -85,20 +85,80 @@ q_work
 #out <- simulate_mcts(units,legal_acts,territory, q_work,c = 5, n_iter = 2000, depth = 6)
 
 
+
+
+#### Individal Explore ####
+
+
+
+
+out <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr'),
+               .inorder = FALSE, .verbose = TRUE, .errorhandling = 'remove',
+               .export = c('actions_samp','yes_fun','trunc_func','grad_reward')) %dopar% {
+                 
+                 
+                 
+                 out <- simulate_one_mcts(rbind(f_players[i],e_target),selected_a,
+                                          legal_a = legal_acts,terr_loc=territory,
+                                          c = 30,
+                                          n_iter = sim_change*1000, depth = 8)  
+                 out <- out[-1,]
+                 out
+               }
+
+out1 <- out %>%
+  mutate(s = str_sub(s.s,6)) %>%
+  group_by(id,s.s) %>%
+  nest()
+
+
+###### While Loop
+
+
+
+
+
+
+
 #q_work <- out[[1]]
 while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   legal_acts <- data.table(adj_df)
   legal_acts[,param := list(c(1,1))]
   print(turn)
-  print(length(q_work$sa))
-  
   print(nrow(q_work$sa))
+  
+  #### Subfind ####
+  
+  f_players <- units[type == 'f']
+  e_target <- units[type == 'e']
+  
+  out <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr'),
+                 .inorder = FALSE, .verbose = TRUE, .errorhandling = 'remove',
+                 .export = c('actions_samp','yes_fun','trunc_func','grad_reward')) %dopar% {
+                   
+                   
+                   
+                   out <- simulate_one_mcts(rbind(f_players[i],e_target),selected_a,
+                                            legal_a = legal_acts,terr_loc=territory,
+                                            c = 30,
+                                            n_iter = 100, depth = 8)  
+                   out <- out[-1,]
+                   out
+                 }
+  
+  out1 <- out %>%
+    mutate(s = str_sub(s.s,6)) %>%
+    group_by(id,s.s) %>%
+    nest()
+  
+  
+  #### Main MCTS ####
   
   #units[,a := NULL]
   out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                       q=q_work,c = 40*nrow(units[type == 'f']),
-                       n_iter = sim_change*500, depth = 15)
+                       q=q_work,c = 20*nrow(units[type == 'f']),
+                       n_iter = sim_change*200, depth = 2, single_out = out1, actions=actions)
   
   q_work <- out[[1]]
   out[[2]]
@@ -118,19 +178,23 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   selected_a <- c(trans[[1]][str>10 & order(id)]$a,trans[[2]][str>10 & order(id)]$a)
   units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
   units <- units[str>10]
+  
+  
+  
+  
   #print(units)
   
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  #write_csv(units_log, 'mcts_test_06mar.csv')
+  write_csv(units_log, 'mcts_test_16mar.csv')
   
 }
 
 
 View(out[[2]])
 
-saveRDS(out,'mcts_test_o6mar.rds')
+saveRDS(out,'mcts_test_16mar.rds')
 
 
 View(data.frame(x = unlist(out[[1]]$q)))
