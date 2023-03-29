@@ -1,10 +1,12 @@
 source('mcts_functs.R')
+source('mcts_one_funcs.R')
+library(DirichletReg)
 #### start the thing
 
 
 
-numu <- 3
-nume <- 4
+numu <- 5
+nume <- 6
 
 posf <- df2 %>%
   ungroup() %>%
@@ -22,7 +24,7 @@ pose <- df2 %>%
 
 f_players <- data.table(
   id = paste0("inf_",1:numu),
-  s = c('020711','030609','050506'),
+  s = c('020711','030609','050506','040507','060404'),
   #s = posf$pos,
   str = 100,
   
@@ -33,7 +35,7 @@ f_players <- data.table(
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
   id = paste0("eny_",1:nume),
-  s = c('050809','071211','070706','061010'),
+  s = c('050809','071211','070706','061010','051011','060909'),
   #s = pose$pos,
   str = 100,
   
@@ -142,7 +144,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
                    out <- simulate_one_mcts(rbind(f_players[i],e_target),selected_a,
                                             legal_a = legal_acts,terr_loc=territory,
                                             c = 30,
-                                            n_iter = 100, depth = 8)  
+                                            n_iter = 500, depth = 8)  
                    out <- out[-1,]
                    out
                  }
@@ -158,7 +160,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   #units[,a := NULL]
   out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
                        q=q_work,c = 20*nrow(units[type == 'f']),
-                       n_iter = sim_change*200, depth = 2, single_out = out1, actions=actions)
+                       n_iter = 1000, depth = 8, single_out = out1, actions=actions)
   
   q_work <- out[[1]]
   out[[2]]
@@ -187,7 +189,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_16mar.csv')
+  write_csv(units_log, 'mcts_test_27mar.csv')
   
 }
 

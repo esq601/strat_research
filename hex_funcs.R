@@ -268,7 +268,7 @@ utility_func <- function(q_lst, state_vec){
 }
 
 
-prob_setup <- function(samep = .2, adjp = .175, adjbp = .125, backp = .05, stayp = 0.15){
+prob_setup <- function(samep = .475, adjp = .175, adjbp = .05, backp = .025, stayp = 0.05){
   
   total <- samep + 2*adjp + 2*adjbp + backp + stayp
   print(total)
@@ -287,5 +287,5 @@ prob_setup <- function(samep = .2, adjp = .175, adjbp = .125, backp = .05, stayp
   prob_tran <- rbind(adj0_tbl,adj1_tbl,adj2_tbl,adj3_tbl,adj4_tbl,adj5_tbl,adj6_tbl)
   return(prob_tran)
 }
-#prob_setup()
+prob_setup()
 
