@@ -3,12 +3,12 @@ library(ggimage)
 library(data.table)
 
 source('hex_setup.R')
-table_out <- data.table(read_csv("mcts_test_27mar.csv"))
+table_out <- data.table(read_csv("mcts_test_27mar_a.csv"))
 
 70-28
 42/3
 
-write_csv(units_log, 'mcts_test_27feb.csv')
+#write_csv(units_log, 'mcts_test_27feb.csv')
 table_out <- units_log
 
 hexdt <- data.table(hexdf2)[,s := pos]
@@ -69,7 +69,7 @@ animate(p1)
 
 
 animate(p1, height = 8, width = 10,fps = 10,duration = 30, units = "in", res = 120)
-anim_save('images/test_fight_mcts8.gif')
+anim_save('images/test_fight_mcts_belief.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

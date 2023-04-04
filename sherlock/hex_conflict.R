@@ -2,8 +2,8 @@
 conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
   
     # These need to be variables in the function
-    fmod <- .25
-    emod <- .35
+    fmod <- .15
+    emod <- .24
     fexp <- 0.9
     texp <- 0.8
     
@@ -49,13 +49,12 @@ reward_conf <- function(conf_out){
                 0)
   
   cbts <- nrow(conf_out[[4]])
-   #print(conf_out)
-  #print(slf)
+  # print(conf_out)
+  # print(slf)
   # print(eny)
-   # print(cbts)
+  # print(cbts)
   # print(target_new)
-  rew <- (eny - slf) + (10*cbts)*nrow(conf_out[[2]][str<10]) - 5*nrow(conf_out[[1]][str<10]) + 5*cbts
+  rew <- (eny - slf) + 10*cbts*nrow(conf_out[[2]][str<10]) - 5*nrow(conf_out[[1]][str<10]) + 5*cbts
   #print(rew)
   return(rew)
-
-  }
+}

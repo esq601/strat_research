@@ -1,7 +1,7 @@
 library(data.table)
-source('hex_setup.R')
-source('hex_conflict.R')
-source('hex_funcs.R')
+source('MCTS/hex_setup.R')
+source('MCTS/hex_conflict.R')
+source('MCTS/hex_funcs.R')
 
 
 matchfun <- function(x,new) {
@@ -26,8 +26,6 @@ dir_setup <- function(dataframe,act_dt,leg_a ) {
   out <- new_dt[a %in% leg_a[s == state]$a]
   return(out)
 }
-
-dir_setup
 
 select_fun <- function(id,state,legal_moves, prob_df,act_dt){
   #print(act_dt)
@@ -56,49 +54,37 @@ select_fun <- function(id,state,legal_moves, prob_df,act_dt){
 }
 
 
-#outtest <- ptest[a == 'adj5' & nexta %in% legal_acts[s == '030407']$a]
-#sample(outtest$nexta,1,prob = outtest$p)
 
-belief_fun <- function(action,state,legal_moves, prob_df,act_dt){
-  #print(prob_df)
-  out <- prob_df[a == action & nexta %in% legal_moves[s == state]$a]
-  
-  
-  #valout <- max.col(rdirichlet(n = 1, alpha = out$q))
-  #print(valout)
-  aout <-sample(out$nexta,1,prob = out$p)
-
-  return(aout)
-  
-}
-
-
-
-execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, depth,prob_b, disc = 0.95) {
+execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, depth, disc = 0.95) {
   
   # Only current states are subsetted
-  #print(lasta)
+  
   t1 <- Sys.time()
-  sa_dt <- lasta[type == 'e',.(s,a)]
-  move <- actions[state[,a := NULL], on = .(s)]
-  #print(sa_dt)
+  # print(lasta)
+  # print(state)
+  move <- actions[state, on = .(s)]
+  # print(move)
+  #lasta <- lasta[id %in% state$id]
   actvec <- vector()
+  # print(probdf)
+  # probdf <- merge(probdf,move, by = 'a')
+  # print(probdf)
+  #print(lasta)
   eny_row <- nrow(lasta[type =='e'])
-  eny_a <- lasta[type == 'e']
   lasta <- lasta[type == 'f']
-  #print(eny_a)
+  #print(c(nrow(lasta),eny_row))
   for(i in 1:nrow(lasta)){
+    #print(lasta[i])
+    #print(actions)
+    #print(probdf)
+    #print(act_dt)
     act_select <- select_fun(id = lasta[[i,1]],state = lasta[[i,2]],actions,probdf,act_dt)
     
     actvec <- c(actvec,act_select)
   }
   
-  for(i in 1:nrow(sa_dt)){
-    #print(eny_a)
-    act_select <- belief_fun(action = sa_dt[[i,2]],state = sa_dt[[i,1]],actions,prob_b,act_dt)
-    #print(act_select)
-    actvec <- c(actvec,act_select)
-  }
+  #print(actvec)
+  actvec <- c(actvec, rep('adj0',eny_row))
   
   td1 <- Sys.time() - t1
   t2 <- Sys.time()
@@ -106,6 +92,10 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   movesel <- data.table(s = state$s, a = actvec, id = state$id)
   
   move <- move[movesel, on = .(s,a,id)]
+  
+  move[type == 'e', a := 'adj0']
+  move[type == 'e', sp := s]
+  
   s_vec <- paste0(t(move[,list(id,s,str,type)]),collapse = '')
   sa_vec <- paste0(paste0(t(move[,list(id,s,str,type)]),collapse = ''),
                    paste0(t(move[type=='f',list(a)]),collapse = ''),
@@ -128,16 +118,11 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
     matches_s <- q_lst$s$s %in% s_vec
     
     matches_s <- which(matches_s)
-
+    # print(matches_s)
     ucb <- ((c*(disc^depth))*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
     
     qsa <- unlist(q_lst$q[matches_s])
-    if(depth ==0){
-      
-      cat(c(unlist(q_lst$a[matches_s]),sum(unlist(q_lst$n[matches_s])),
-      unlist(q_lst$n[matches_s]),'ucb:',ucb,'qsa:',qsa),'\r')
-    }
-
+    
     ucb <- ucb + qsa
     
     movenew <- data.table(s = move[type == 'f']$s,str = move[type == 'f']$str,type = 'f',
@@ -157,12 +142,9 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
     
     trans <- transition_function(movenew,move[type == 'e'])
     
-    #grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
     
-    #rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
-    grad_rew <- 0#grad_reward(trans, grad, c = .25)
-    
-    rew <- reward_new(trans,grad,grad_rew)
+    rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
     
     td2 <- Sys.time() - t2
     typeout <- 'update'
@@ -170,7 +152,7 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   }else{
     
     type_act <- 'new'
-    #print(move)
+
     trans <- transition_function(move[type == 'f'],move[type == 'e'])
     # print(trans)
     grad_rew <- 0#grad_reward(trans, grad, c = .25)
@@ -181,8 +163,6 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   }
   
   dtout <- data.table(init = td1, ifs = td2, type = typeout)
-  
-  #print(list('he',trans[[1]],trans[[2]]))
   return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act,dtout))
   
 }
@@ -245,7 +225,7 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
     
     val <- (val + gamma^j * u_ind)
     
-    q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
+    q_lst$q[outnew] <- list(val)
     
   } 
   
@@ -260,7 +240,6 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
   df_type <- data.frame()
   time_stamp <- Sys.time()
   actions_dt <- data.table(actions)
-  prob_base <- prob_setup()
   
   df_log <- data.table()
   for(i in 1:n_iter){
@@ -279,8 +258,7 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
     while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
       
       #if(j == 0 ){
-        input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
-                                  type = units_new$type, a = last_a)
+        input_state <- data.table(s = units_new$s, a = last_a,id = units_new$id, type = units_new$type)
         
       #} else {
         
@@ -290,13 +268,10 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
       
       time <- Sys.time()
+      out <- execute_action(state=units_new,actions = legal_a,grad = terr_loc,
+                            q_lst=q,c=c, lasta = units_new,act_dt = actions_dt,
+                            probdf = single_out, depth = j, disc = 0.95)
       
-      #print(input_state)
-      #print(units_new)
-      out <- execute_action(state=input_state,actions = legal_a,grad = terr_loc,
-                            q_lst=q,c=c, lasta = input_state,act_dt = actions_dt,
-                            probdf = single_out, depth = j,prob_b = prob_base, disc = 0.95)
-      #print(out[[1]])
       df_log <- rbind(df_log,out[[5]])
       #print(c("Time Execute", Sys.time()-time))
       

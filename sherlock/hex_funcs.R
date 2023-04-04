@@ -157,12 +157,10 @@ gradient_function <- function(players,target){
 conf_check <- function(players,target){
   
   conf_all <- data.table(player=character(),target=character())
-  #print(players)
-  #print(target)
-  swap <- nrow(players[target , on = .(sp == s , s == sp),nomatch = 0])
-  if(swap > 0){
+  
+  if(nrow(players[target , on = .(sp == s , s == sp),nomatch = 0]>0)){
     
-    #print('here')
+    
     atkrs <- data.table(player = players[target , on = .(sp == s , s == sp),nomatch = 0]$id,
                         target = players[target , on = .(sp == s , s == sp),nomatch = 0]$i.id )
     
@@ -270,10 +268,10 @@ utility_func <- function(q_lst, state_vec){
 }
 
 
-prob_setup <- function(samep = .675, adjp = .075, adjbp = .05, backp = .025, stayp = 0.05){
+prob_setup <- function(samep = .475, adjp = .175, adjbp = .05, backp = .025, stayp = 0.05){
   
   total <- samep + 2*adjp + 2*adjbp + backp + stayp
-  #print(total)
+  print(total)
   if(total != 1){
     stop("Probability total not equal to 1")
     
@@ -284,10 +282,10 @@ prob_setup <- function(samep = .675, adjp = .075, adjbp = .05, backp = .025, sta
   adj4_tbl <- data.table(a = c(rep('adj4',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,backp,adjbp,adjp,samep,adjp,adjbp))
   adj5_tbl <- data.table(a = c(rep('adj5',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjbp,backp,adjbp,adjp,samep,adjp))
   adj6_tbl <- data.table(a = c(rep('adj6',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjp,adjbp,backp,adjbp,adjp,samep))
-  adj0_tbl <- data.table(a = c(rep('adj0',7)), nexta = c(paste0("adj",0:6)), p = c(1,1/10,1/10,1/10,1/10,1/10,1/10))
+  adj0_tbl <- data.table(a = c(rep('adj0',7)), nexta = c(paste0("adj",0:6)), p = c(1/7))
   
   prob_tran <- rbind(adj0_tbl,adj1_tbl,adj2_tbl,adj3_tbl,adj4_tbl,adj5_tbl,adj6_tbl)
   return(prob_tran)
 }
-ptest <- prob_setup()
+prob_setup()
 
