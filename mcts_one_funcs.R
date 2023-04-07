@@ -7,21 +7,39 @@ cl <- makeCluster(cores[1]/2) #not to overload your computer
 registerDoParallel(cl)
 cores
 
-execute_one_action <- function(state,actions,grad,q_lst,c, lasta, probdf, depth, disc = 0.95) {
+execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf, depth, disc = 0.95) {
   
   # Only current states are subsetted
+  
+  sa_dt <- lasta[type == 'e',.(s,a)]
+  move <- actions[state[,a := NULL], on = .(s)]
+  #print(sa_dt)
+  actvec <- vector()
+  eny_row <- nrow(lasta[type =='e'])
+  eny_a <- lasta[type == 'e']
+  lasta <- lasta[type == 'f']
+  
+
+  
   
   move <- actions[state, on = .(s)]
   
   actvec <- sample(move[type == 'f']$a,1)
   
-  esel <- state[type == 'e', .(s,id)]
-  esel$a <- 'adj0'
+  for(i in 1:nrow(sa_dt)){
+    #print(eny_a)
+    act_select <- belief_fun(action = sa_dt[[i,2]],state = sa_dt[[i,1]],actions,probdf,act_dt)
+    #print(act_select)
+    actvec <- c(actvec,act_select)
+  }
   
-  movesel <- data.table(s = state[type == 'f']$s, a = actvec,
-                        id = state[type == 'f']$id)
+  # esel <- state[type == 'e', .(s,id)]
+  # esel$a <- 'adj0'
   
-  movesel <- rbind(movesel,esel)
+  movesel <- data.table(s = state$s, a = actvec,
+                        id = state$id)
+  
+  #movesel <- rbind(movesel,esel)
   
   move <- move[movesel, on = .(s,a,id)]
   
@@ -152,7 +170,7 @@ q_one_update <- function(q_lst, transition, gamma = 0.95,j) {
     
     val <- (val + gamma^j * u_ind)
     
-    q_lst$q[outnew] <- list(val)
+    q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
     
   } 
   
@@ -161,11 +179,12 @@ q_one_update <- function(q_lst, transition, gamma = 0.95,j) {
 
 
 
-simulate_one_mcts <- function(unit_obj,last_a, legal_a, terr_loc, c = 5, n_iter = 250, depth = 5){
+simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, n_iter = 250, depth = 5){
   
   avg_u <- 0
   bigval <- 0
   df_type <- data.frame()
+  actdt <- data.table(actions)
   prob_tran <- prob_setup()
   time_stamp <- Sys.time()
   
@@ -176,6 +195,7 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a, terr_loc, c = 5, n_iter 
             q = list(0), n =list(1), grad_rew = 0)
   
   df_log <- data.table()
+  
   for(i in 1:n_iter){
     units_new <- unit_obj
     
@@ -192,8 +212,8 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a, terr_loc, c = 5, n_iter 
     while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
       
       #if(j == 0 ){
-      input_state <- data.table(s = units_new$s, a = last_a,id = units_new$id)
-      
+      input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
+                                type = units_new$type, a = last_a)
       #} else {
       
       #input_state <- data.table(s = units_new$s, a = acts_new,id = units_new$id)
@@ -202,8 +222,8 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a, terr_loc, c = 5, n_iter 
       
       
       time <- Sys.time()
-      out <- execute_one_action(state=units_new,actions = legal_a,grad = terr_loc,
-                                q_lst=q,c=c, lasta = input_state,
+      out <- execute_one_action(state=input_state,actions = legal_a,grad = terr_loc,
+                                q_lst=q,c=c,act_dt=actdt, lasta = input_state,
                                 probdf = prob_tran, depth = j, disc = 0.95)
       
       #print(c("Time Execute", Sys.time()-time))
@@ -230,7 +250,7 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a, terr_loc, c = 5, n_iter 
     }
     
     for(k in length(lst_out):1){
-      
+      #print(lst_out[[k]])
       q_temp <- q_one_update(q,lst_out[[k]], gamma = 0.95, j = k)
       
       q <- q_temp[[1]]

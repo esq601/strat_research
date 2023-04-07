@@ -80,8 +80,10 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   #print(lasta)
   t1 <- Sys.time()
   sa_dt <- lasta[type == 'e',.(s,a)]
+  
+  
   move <- actions[state[,a := NULL], on = .(s)]
-  #print(sa_dt)
+  #print(move)
   actvec <- vector()
   eny_row <- nrow(lasta[type =='e'])
   eny_a <- lasta[type == 'e']
@@ -104,6 +106,7 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   t2 <- Sys.time()
   
   movesel <- data.table(s = state$s, a = actvec, id = state$id)
+  #print(movesel)
   
   move <- move[movesel, on = .(s,a,id)]
   s_vec <- paste0(t(move[,list(id,s,str,type)]),collapse = '')
@@ -132,11 +135,11 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
     ucb <- ((c*(disc^depth))*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
     
     qsa <- unlist(q_lst$q[matches_s])
-    if(depth ==0){
-      
-      cat(c(unlist(q_lst$a[matches_s]),sum(unlist(q_lst$n[matches_s])),
-      unlist(q_lst$n[matches_s]),'ucb:',ucb,'qsa:',qsa),'\r')
-    }
+    # if(depth ==0){
+    # 
+    #   cat(c(unlist(q_lst$a[matches_s]),sum(unlist(q_lst$n[matches_s])),
+    #   unlist(q_lst$n[matches_s]),'ucb:',ucb,'qsa:',qsa),'\r')
+    # }
 
     ucb <- ucb + qsa
     
@@ -242,8 +245,14 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
     u_ind <- utility_func(q_lst, s_vec)
     
     q_lst$n[outnew] <- list(q_lst$n[[outnew]]+1)
-    
+    if(u_ind > 25){
+      print(u_ind)
+      print(val)
+    }
     val <- (val + gamma^j * u_ind)
+    if(u_ind > 25){
+      print(val)
+    }
     
     q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
     
@@ -261,9 +270,12 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
   time_stamp <- Sys.time()
   actions_dt <- data.table(actions)
   prob_base <- prob_setup()
-  
   df_log <- data.table()
+  print(unit_obj)
   for(i in 1:n_iter){
+    
+    acts_new <- last_a
+    
     units_new <- unit_obj
     
     j <- 0
@@ -280,7 +292,7 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
       #if(j == 0 ){
         input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
-                                  type = units_new$type, a = last_a)
+                                  type = units_new$type, a = acts_new)
         
       #} else {
         
@@ -288,7 +300,7 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
         
       #}
       
-      
+      #print(input_state)
       time <- Sys.time()
       
       #print(input_state)
@@ -307,12 +319,31 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       units_new <- data.table(id = c(out[[1]]$id), s = c(out[[1]]$sp),
                               str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a))
       
+      # if(min(units_new$str) < 10){
+      #   print('One down!')
+      #   print(units_new)
+      #   #print('yoo')
+      #   #print(acts_new[which(units_new$str > 10)])
+      #   
+      # }
+      # 
+      # if(max(units_new$str) < 100){
+      #   print('all fightin!')
+      #   print(units_new)
+      #   #print('yoo')
+      #   #print(acts_new[which(units_new$str > 10)])
+      #   
+      # }
+      
       old_len <- nrow(units_new)
       units_new <- units_new[str > 10]
+      
+      
       new_len <- nrow(units_new)
 
-      acts_new <- units_new$a
-      
+      acts_new <- acts_new[which(units_new$str > 10)]
+
+
       units_new[, a:= NULL]
       
       j <- j + 1
@@ -320,6 +351,8 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
       
     }
+    
+    
     
     for(k in length(lst_out):1){
       
@@ -331,16 +364,6 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
     
     val <- unlist(q_temp[[2]])
     val[is.null(val)] <- 0
-    
-    # avg_u <- avg_u + (val-avg_u)/i
-    
-    # if(val > avg_u) {
-    #   legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
-    #           param := list(lapply(param,vec_add,add_vector = c(.01,0) ))]
-    # } else {
-    #   legal_a[paste(s,a) %in% paste(lst_out[[1]][[1]]$s,lst_out[[1]][[1]]$a),
-    #           param := list(lapply(param,vec_add,add_vector =  c(0,.01) ))]
-    # }
     
     
   }

@@ -159,12 +159,16 @@ conf_check <- function(players,target){
   conf_all <- data.table(player=character(),target=character())
   #print(players)
   #print(target)
-  swap <- nrow(players[target , on = .(sp == s , s == sp),nomatch = 0])
-  if(swap > 0){
+  swap <- players[target , on = .(sp == s , s == sp),nomatch = 0]
+  same <- players[target, on = 'sp', nomatch = 0, allow.cartesian = TRUE]
+  def1 <- players[target , on = .(sp == s ),nomatch = 0]
+  def2 <- target[players , on = .(sp == s ),nomatch = 0]
+  
+  if(nrow(swap) > 0){
     
     #print('here')
-    atkrs <- data.table(player = players[target , on = .(sp == s , s == sp),nomatch = 0]$id,
-                        target = players[target , on = .(sp == s , s == sp),nomatch = 0]$i.id )
+    atkrs <- data.table(player = swap$id,
+                        target = swap$i.id )
     
     target[id %in% atkrs$target ,]$sp <- target[id %in% atkrs$target,]$s
     players[id %in% atkrs$player,]$sp <- players[id %in% atkrs$player,]$s
@@ -172,25 +176,25 @@ conf_check <- function(players,target){
     conf_all <- rbind(conf_all,atkrs)
   }
   
-  if(nrow(players[target, on = 'sp', nomatch = 0]) > 0) {
+  if(nrow(same) > 0) {
     
-    atkrs_same <- data.table(player = players[target, on = 'sp', nomatch = 0]$id,
-                             target = players[target, on = 'sp', nomatch = 0]$i.id )
+    atkrs_same <- data.table(player = same$id,
+                             target = same$i.id )
     
     conf_all <- rbind(conf_all, atkrs_same)
   }
   
   
-  if(nrow(players[target , on = .(sp == s ),nomatch = 0]) > 0) {
-    dfenders <- data.table(player = players[target , on = .(sp == s ),nomatch = 0]$id,
-                           target = players[target , on = .(sp == s ),nomatch = 0]$i.id )
+  if(nrow(def1) > 0) {
+    dfenders <- data.table(player = def1$id,
+                           target = def1$i.id )
     
     conf_all <-rbind(conf_all, dfenders)
   }
   
-  if(nrow(target[players , on = .(sp == s ),nomatch = 0]) > 0) {
-    dfenders2 <- data.table(player = target[players , on = .(sp == s ),nomatch = 0]$i.id,
-                            target = target[players , on = .(sp == s ),nomatch = 0]$id )
+  if(nrow(def2) > 0) {
+    dfenders2 <- data.table(player = def2$i.id,
+                            target = def2$id )
     
     conf_all <- rbind(conf_all, dfenders2)
   }
@@ -219,14 +223,21 @@ transition_function <- function(players,target){
     conf_out <- conflict(conf_all,players,target)
     
     players_conf <- players[conf_out[[1]], on = "id == player"]
-    players_conf[,c("str_old","str"):= .(str,max(0,str-mod))]
+    #print('yo')
+    #print(players_conf)
+    #players_conf$str_old <- players_conf$str
+    #players_conf$str <- max(0,players_conf$str-players_conf$mod)
+    players_conf[,c("str_old","str"):= .(str,str-mod)]
+    players_conf[str < 0, str := 0]
     players_conf[,mod:= NULL]
     players_conf[,sp := s]
     
+    #print(players_conf)
     players_out <- rbind(players_noconf,players_conf)
     
     target_conf <- target[conf_out[[2]], on = "id == target"]
-    target_conf[,c("str_old","str"):= .(str,max(0,str-mod))]
+    target_conf[,c("str_old","str"):= .(str,str-mod)]
+    target_conf[str < 0, str := 0]
     target_conf[,mod:= NULL]
     target_conf[,sp := s]
     target_out <- rbind(target_noconf,target_conf)
@@ -263,9 +274,10 @@ transition_function <- function(players,target){
 
 
 utility_func <- function(q_lst, state_vec){
+  
   s_ind <- which(q_lst$s$s %in% state_vec)
   #print(s_ind)
-  #print(unlist(q_lst$q[s_ind]))
+  print(unlist(q_lst$q[s_ind]))
   return(max(unlist(q_lst$q[s_ind]))[1])
 }
 

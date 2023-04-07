@@ -5,7 +5,7 @@ library(DirichletReg)
 
 
 
-numu <- 2
+numu <- 3
 nume <- 2
 
 posf <- df2 %>%
@@ -24,7 +24,7 @@ pose <- df2 %>%
 
 f_players <- data.table(
   id = paste0("inf_",1:numu),
-  s = c('020711','040507'),
+  s = c('040507','060707','080907'),
   #s = posf$pos,
   str = 100,
   
@@ -35,7 +35,7 @@ f_players <- data.table(
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
   id = paste0("eny_",1:nume),
-  s = c('081008','071110'),
+  s = c('091108','101006'),
   #s = pose$pos,
   str = 100,
   
@@ -75,14 +75,14 @@ sim_change <- 1
 
 
 
-selected_a <- c(rep('adj2',nrow(units[type == 'f'])), rep('adj5',nrow(units[type == 'e'])))
+selected_a <- c(rep('adj0',nrow(units[type == 'f'])), rep('adj5',nrow(units[type == 'e'])))
 
 
 
 # q_work <- list(s = list(as.vector(t(units))), a = list(selected_a),
 #                sa = list(as.vector(c(t(units),t(selected_a)))), q = list(0), n =list(1), grad_rew = 0)#rew_start)
 
-
+q_eny <- q_work
 q_work
 #out <- simulate_mcts(units,legal_acts,territory, q_work,c = 5, n_iter = 2000, depth = 6)
 
@@ -123,7 +123,7 @@ q_work
 
 
 #q_work <- out[[1]]
-while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
+while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 25){
   
   legal_acts <- data.table(adj_df)
   legal_acts[,param := list(c(1,1))]
@@ -145,8 +145,8 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
                    
                    out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                              legal_a = legal_acts,terr_loc=territory,actions = actions,
-                                             c = 20,
-                                             n_iter = 500, depth = 8)  
+                                             c = 15,
+                                             n_iter = 500, depth = 10)  
                    out <- out[-1,]
                    out
                  }
@@ -163,23 +163,72 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   #### Main MCTS ####
   
   #units[,a := NULL]
-  out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                       q=q_work,c =2*nrow(units[type == 'f']),
-                       n_iter = 1000, depth =7, single_out = out1, actions=actions)
+  out_tes <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
+                       q=q_work,c =5*nrow(units[type == 'f']),
+                       n_iter = 10000, depth =8, single_out = out1, actions=actions)
   
   q_work <- out[[1]]
-  out[[2]]
+  out[[2]][order(-q)]
   #out[[2]][order(-q)][[1,2]]
   #rep('adj0',nrow(units[type == 'e']))
   
   #### Added this if statement to setup fixed policy for E
   #### To return, leave the adj0 one without if
-  if(turn < 5){
-    units[,a :=c(out[[2]][order(-q)][[1,2]],rep('adj5',nrow(units[type == 'e']))) ]
-  } else{
-    units[,a :=c(out[[2]][order(-q)][[1,2]],rep('adj0',nrow(units[type == 'e']))) ]
-  }
-
+  
+  
+  
+  #### Determine opponent action!
+  
+  units_eny <- copy(units)
+  
+  units_eny[,type := ifelse(type == 'e','f','e')]
+  units_eny <- units_eny[order(-type,id)]
+  
+  f_players <- units_eny[type == 'f']
+  e_target <- units_eny[type == 'e']
+  
+  selected_a_eny <- c(selected_a[(length(selected_a)-nrow(f_players)+1):length(selected_a)],
+                      selected_a[1:nrow(e_target)])
+  
+  
+  out_single <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr'),
+                        .inorder = FALSE, .verbose = TRUE, .errorhandling = 'remove',
+                        .export = c('actions_samp','yes_fun','trunc_func','grad_reward')) %dopar% {
+                          
+                          
+                          single_a <- c(selected_a_eny[i],selected_a_eny[(length(selected_a)-nrow(e_target)+1):length(selected_a_eny)])
+                          
+                          
+                          out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
+                                                   legal_a = legal_acts,terr_loc=territory,actions = actions,
+                                                   c = 20,
+                                                   n_iter = 250, depth = 10)  
+                          out <- out[-1,]
+                          out
+                        }
+  #hold <- out_single
+  
+  out_single[,q:=ifelse(q < 0, 0, q)]
+  
+  out1 <- out_single %>%
+    mutate(s = str_sub(s.s,6)) %>%
+    group_by(id,s.s) %>%
+    nest()
+  
+  out_single
+  #### Main MCTS ####
+  
+  #units[,a := NULL]
+  out_eny <- simulate_mcts(units_eny,selected_a_eny,legal_a = legal_acts,terr_loc=territory, 
+                       q=q_work,c =10*nrow(units_eny[type == 'f']),
+                       n_iter = 2500, depth =8, single_out = out1, actions=actions)
+  
+  
+  
+  out_eny[[2]][order(-q)]
+  units[,a :=c(out[[2]][order(-q)][[1,2]],out_eny[[2]][order(-q)][[1,2]]) ]
+  
+  
   
   move <- legal_acts[units, on = .(s,a)]
   print(move)
@@ -200,7 +249,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  #write_csv(units_log, 'mcts_test_27mar.csv')
+  write_csv(units_log, 'mcts_test_two_player_05aprc.csv')
   
 }
 
