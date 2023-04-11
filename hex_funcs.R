@@ -159,10 +159,10 @@ conf_check <- function(players,target){
   conf_all <- data.table(player=character(),target=character())
   #print(players)
   #print(target)
-  swap <- players[target , on = .(sp == s , s == sp),nomatch = 0]
+  swap <- players[target , on = .(sp == s , s == sp),nomatch = 0, allow.cartesian = TRUE]
   same <- players[target, on = 'sp', nomatch = 0, allow.cartesian = TRUE]
-  def1 <- players[target , on = .(sp == s ),nomatch = 0]
-  def2 <- target[players , on = .(sp == s ),nomatch = 0]
+  def1 <- players[target , on = .(sp == s ),nomatch = 0, allow.cartesian = TRUE]
+  def2 <- target[players , on = .(sp == s ),nomatch = 0, allow.cartesian = TRUE]
   
   if(nrow(swap) > 0){
     
@@ -277,7 +277,7 @@ utility_func <- function(q_lst, state_vec){
   
   s_ind <- which(q_lst$s$s %in% state_vec)
   #print(s_ind)
-  print(unlist(q_lst$q[s_ind]))
+  # print(unlist(q_lst$q[s_ind]))
   return(max(unlist(q_lst$q[s_ind]))[1])
 }
 

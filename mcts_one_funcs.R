@@ -198,6 +198,7 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
   
   for(i in 1:n_iter){
     units_new <- unit_obj
+    acts_new <- last_a
     
     j <- 0
     
@@ -213,7 +214,7 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
       
       #if(j == 0 ){
       input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
-                                type = units_new$type, a = last_a)
+                                type = units_new$type, a = acts_new)
       #} else {
       
       #input_state <- data.table(s = units_new$s, a = acts_new,id = units_new$id)
@@ -239,7 +240,7 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
       units_new <- units_new[str > 10]
       new_len <- nrow(units_new)
       
-      acts_new <- units_new$a
+      acts_new <- acts_new[which(units_new$str > 10)]
       
       units_new[, a:= NULL]
       

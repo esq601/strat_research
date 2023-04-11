@@ -65,8 +65,8 @@ territory[,lst := Map(list,x_pos,y_pos)]
 unit_trans[[2]]
 rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
 
-q_work <- list(s = data.table(s = paste0(t(units),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
-               sa = data.table(sa = paste0(paste0(t(units),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
+q_work <- list(s = data.table(s = paste0(t(units[type == 'f',c('id','s')]),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
+               sa = data.table(sa = paste0(paste0(t(units[type == 'f',c('id','s')]),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
                q = list(0), n =list(1), grad_rew = 0)#rew_start)
 
 
@@ -145,14 +145,14 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                    
                    out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                              legal_a = legal_acts,terr_loc=territory,actions = actions,
-                                             c = 15,
-                                             n_iter = 500, depth = 10)  
+                                             c = .2,
+                                             n_iter = 500, depth = 8)  
                    out <- out[-1,]
                    out
                  }
   #hold <- out_single
   
-  out_single[,q:=ifelse(q < 0, 0, q)]
+  (out_single[,q:=ifelse(q < 0, 0, q)])
   
   out1 <- out_single %>%
     mutate(s = str_sub(s.s,6)) %>%
@@ -163,12 +163,12 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   #### Main MCTS ####
   
   #units[,a := NULL]
-  out_tes <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                       q=q_work,c =5*nrow(units[type == 'f']),
-                       n_iter = 10000, depth =8, single_out = out1, actions=actions)
+  out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
+                       q=q_work,c =.2,
+                       n_iter = 2000, depth =8, single_out = out1, actions=actions)
   
-  q_work <- out[[1]]
-  out[[2]][order(-q)]
+  #q_work <- out[[1]]
+  View(out[[2]][order(-q)])
   #out[[2]][order(-q)][[1,2]]
   #rep('adj0',nrow(units[type == 'e']))
   
@@ -191,6 +191,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                       selected_a[1:nrow(e_target)])
   
   
+  
   out_single <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr'),
                         .inorder = FALSE, .verbose = TRUE, .errorhandling = 'remove',
                         .export = c('actions_samp','yes_fun','trunc_func','grad_reward')) %dopar% {
@@ -201,8 +202,8 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                           
                           out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                                    legal_a = legal_acts,terr_loc=territory,actions = actions,
-                                                   c = 20,
-                                                   n_iter = 250, depth = 10)  
+                                                   c = .2,
+                                                   n_iter = 250, depth = 8)  
                           out <- out[-1,]
                           out
                         }
@@ -220,8 +221,8 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   #units[,a := NULL]
   out_eny <- simulate_mcts(units_eny,selected_a_eny,legal_a = legal_acts,terr_loc=territory, 
-                       q=q_work,c =10*nrow(units_eny[type == 'f']),
-                       n_iter = 2500, depth =8, single_out = out1, actions=actions)
+                       q=q_work,c =.1,
+                       n_iter = 1500, depth =8, single_out = out1, actions=actions)
   
   
   
@@ -240,16 +241,12 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   selected_a <- c(trans[[1]][str>10 & order(id)]$a,trans[[2]][str>10 & order(id)]$a)
   units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
   units <- units[str>10]
-  
-  
-  
-  
   #print(units)
   
   
   turn <- turn + 1
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  write_csv(units_log, 'mcts_test_two_player_05aprc.csv')
+  write_csv(units_log, 'mcts_test_two_player_05apre.csv')
   
 }
 
@@ -287,7 +284,7 @@ testlst <- out_test[[1]]$q[keep_val]
 
 ### explore exploit examine
 
-expexp <- out[[3]]
+expexp <- out_eny[[3]]
 
 
 expexp2 <- expexp %>%
@@ -307,7 +304,7 @@ ggplot(expexp2) +
     title = "Sample MCTS Search for Tactical Action",
     subtitle = "Subgraph at each depth of search."
   )
-#ggsave('images/mctsexample.jpeg',height = 6, width = 8, dpi = 320)
+#ggsave('images/mcts_expexp_07apr.jpeg',height = 6, width = 8, dpi = 320)
 
 
 

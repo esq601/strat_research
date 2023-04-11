@@ -109,8 +109,8 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   #print(movesel)
   
   move <- move[movesel, on = .(s,a,id)]
-  s_vec <- paste0(t(move[,list(id,s,str,type)]),collapse = '')
-  sa_vec <- paste0(paste0(t(move[,list(id,s,str,type)]),collapse = ''),
+  s_vec <- paste0(t(move[type=='f',list(id,s)]),collapse = '')
+  sa_vec <- paste0(paste0(t(move[type == 'f',list(id,s)]),collapse = ''),
                    paste0(t(move[type=='f',list(a)]),collapse = ''),
                    collapse = '')
   
@@ -135,11 +135,12 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
     ucb <- ((c*(disc^depth))*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
     
     qsa <- unlist(q_lst$q[matches_s])
-    # if(depth ==0){
-    # 
-    #   cat(c(unlist(q_lst$a[matches_s]),sum(unlist(q_lst$n[matches_s])),
-    #   unlist(q_lst$n[matches_s]),'ucb:',ucb,'qsa:',qsa),'\r')
-    # }
+    
+    if(depth ==0){
+
+      cat(c(sum(unlist(q_lst$n[matches_s])),
+      unlist(q_lst$n[matches_s]),'ucb:',round(ucb,digits = 2),'qsa:',round(qsa,digits = 2)),'\r')
+    }
 
     ucb <- ucb + qsa
     
@@ -184,24 +185,24 @@ execute_action <- function(state,actions,grad,q_lst,c, lasta,act_dt, probdf, dep
   }
   
   dtout <- data.table(init = td1, ifs = td2, type = typeout)
-  
+  #print(rew)
   #print(list('he',trans[[1]],trans[[2]]))
   return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act,dtout))
   
 }
 
 
-q_update <- function(q_lst, transition, gamma = 0.95,j) {
+q_update <- function(q_lst, transition,last_val, gamma = 0.95,j) {
   
   trigger <- F
   
   transition[[1]][order(id)]
   #print(transition)
-  s_old_vec <- paste0(t(transition[[1]][,list(id,s,str_old,type)]),collapse = '')
+  s_old_vec <- paste0(t(transition[[1]][type == 'f',list(id,s)]),collapse = '')
   
-  s_vec <- paste0(t(transition[[1]][,list(id,sp,str,type)]),collapse = '')
+  s_vec <- paste0(t(transition[[1]][type =='f',list(id,sp)]),collapse = '')
   
-  sa_vec <- paste0(paste0(t(transition[[1]][,list(id,s,str_old,type)]),collapse = ''),
+  sa_vec <- paste0(paste0(t(transition[[1]][type == 'f',list(id,s)]),collapse = ''),
                    paste0(t(transition[[1]][type=='f',list(a)]),collapse = ''),
                    collapse = '')
   
@@ -217,22 +218,28 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
   ### If there is no match, initiate counter and set Q=r
   if(length(outnew) == 0) {
     
+    
+    val <- (val + gamma^j * last_val)
+    
     q_lst$s <- rbind(q_lst$s,data.table(s = s_old_vec))
     q_lst$a <- append(q_lst$a,list(as.vector(t(transition[[1]][type=='f',list(a)]))))
     q_lst$sa <- rbind(q_lst$sa,data.table(sa = sa_vec))
     q_lst$q <- append(q_lst$q,list(val))
     q_lst$n <- append(q_lst$n,list(1))
     q_lst$grad_rew <- append(q_lst$grad_rew,transition[[2]])
+
+
     
   } 
   ### Else, add the reward to U(s') and increment N(s,a)
   
-  matches_s <- q_lst$s$s %in% s_vec
+  #matches_s <- q_lst$s$s %in% s_vec
   #print(matches_s)
-  next_state <- which(matches_s, arr.ind = FALSE)
+  #next_state <- which(matches_s, arr.ind = FALSE)
   
   # If next state does not exist
-  if(length(next_state) > 0){
+  #if(length(next_state) > 0){
+    else{
     
     # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
     #                                                        t(transition[[1]][type=='f',list(a)]))))
@@ -242,22 +249,26 @@ q_update <- function(q_lst, transition, gamma = 0.95,j) {
     matches <-  q_lst$sa$sa %in% sa_vec
     outnew <- which(matches, arr.ind = FALSE)
     #print(outnew)
-    u_ind <- utility_func(q_lst, s_vec)
+    #u_ind <- utility_func(q_lst, s_vec)
+    #print(last_val)
+    u_ind <- last_val
     
     q_lst$n[outnew] <- list(q_lst$n[[outnew]]+1)
-    if(u_ind > 25){
-      print(u_ind)
-      print(val)
-    }
+    # if(u_ind > 25){
+    #   print(u_ind)
+    #   print(val)
+    # }
     val <- (val + gamma^j * u_ind)
-    if(u_ind > 25){
-      print(val)
-    }
+    # if(u_ind > 25){
+    #   print(val)
+    # }
+    
+    #print(val)
     
     q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
     
-  } 
-  
+  }
+  #print(val)
   return(list(q_lst,val,outnew,trigger))
 }
 
@@ -356,9 +367,19 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
     
     for(k in length(lst_out):1){
       
-      q_temp <- q_update(q,lst_out[[k]], gamma = 0.95, j = k)
+      if(k == length(lst_out)){
+        last_val_in <- 0
+      }
+      
+      # print('update')
+      # print(k)
+      # #print(lst_out[[k]])
+      # print(last_val_in)
+      q_temp <- q_update(q,lst_out[[k]],last_val_in, gamma = 0.95, j = k)
       
       q <- q_temp[[1]]
+      
+      last_val_in <- q_temp[[2]]
       
     }
     
@@ -368,7 +389,7 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
     
   }
   #print(unit_obj)
-  s_vec <- paste0(t(unit_obj[,list(id,s,str,type)]),collapse = '')
+  s_vec <- paste0(t(unit_obj[type == 'f',list(id,s)]),collapse = '')
   
   state_in <- q$s$s %in% s_vec
   #print(q$s$s[1:100])
