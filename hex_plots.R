@@ -43,15 +43,19 @@ ggplot(hexdf2, aes (x=x_h, y = y_h)) +
   theme_void()
 
 #Plot with position codes
+head(hexdf2)
 
+hexdf2a <- hexdf2 %>%
+  mutate(new = sqrt(x^2 + z^2 +y^2))
 
-ggplot(hexdf2  , aes(x = x_pos, y = y_pos)) +
+ggplot(hexdf2a  , aes(x = x_pos, y = y_pos)) +
   geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h), fill = 'transparent') +
   coord_equal() +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
                     values = c('darkgreen','red','transparent')) +
   theme_void() +
-  geom_text(aes(label = pos),size = 3) +
+  # geom_text(aes(label = pos),size = 3) +
+  geom_text(aes(label = new),size = 3) +
   labs(
     title = "Sample Hex-Grid with Location IDs"
   ) +

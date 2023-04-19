@@ -20,7 +20,7 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
   lasta <- lasta[type == 'f']
   
 
-  
+  next_state <- NA
   
   move <- actions[state, on = .(s)]
   
@@ -28,7 +28,11 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
   
   for(i in 1:nrow(sa_dt)){
     #print(eny_a)
-    act_select <- belief_fun(action = sa_dt[[i,2]],state = sa_dt[[i,1]],actions,probdf,act_dt)
+    act_select <- belief_fun(action = sa_dt[[i,2]],state = sa_dt[[i,1]],actions,probdf,act_dt,next_state)
+    
+    
+    next_state <- c(next_state,actions[s == sa_dt[[i,1]] & a == act_select]$sp)
+    
     #print(act_select)
     actvec <- c(actvec,act_select)
   }
@@ -90,9 +94,12 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
     
     trans <- transition_function(movenew,move[type == 'e'])
     
-    grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    # grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    # 
+    # rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    grad_rew <- 0#grad_reward(trans, grad, c = .25)
     
-    rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
+    rew <- reward_new(trans,grad_rew, mode = 'ind')
     
     typeout <- 'update'
     
@@ -104,7 +111,7 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
     # print(trans)
     grad_rew <- 0#grad_reward(trans, grad, c = .25)
     
-    rew <- reward_new(trans,grad,grad_rew)
+    rew <- reward_new(trans,grad_rew, mode = 'ind')
     typeout <- 'new'
   }
   
@@ -134,8 +141,8 @@ q_one_update <- function(q_lst, transition, gamma = 0.95,j) {
   outnew <- which(matches, arr.ind = FALSE)
   # print(outnew)
   # print(transition[[4]])
-  val <- transition[[2]]
-  
+  val <- transition[[2]][[1]]
+  #print(val)
   ### If there is no match, initiate counter and set Q=r
   if(length(outnew) == 0) {
     
@@ -266,3 +273,4 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
   
   return(out)
 }
+

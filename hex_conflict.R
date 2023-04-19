@@ -7,11 +7,11 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
     fexp <- 1
     texp <- 1
       
-      print(conflicts)
+      # print(conflicts)
     ppower <- conflicts[,by= player, .(engs_plr =uniqueN(target))]
     
     ppower[pl, on = 'player == id', atk_plr := str/engs_plr]
-    print(ppower)
+    # print(ppower)
     tpower <- conflicts[,by= target, .(engs_tgt =uniqueN(player))]
     tpower[tg, on = 'target == id', atk_tgt := str/engs_tgt]
     
@@ -28,18 +28,18 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
     #   
     # }
     
-    print(fight_tbl)
+    # print(fight_tbl)
     #floor(fmod*(sum(atk_tgt)^fexp * sum(engs_tgt)^texp)),mod2 =
     players <- fight_tbl[, by = player, .(mod =  floor(sum(plr_mod)))]
     targets <- fight_tbl[, by = target, .(mod =floor(sum(tgt_mod)))]
     
-     print(players)
-     print(targets)
+      #print(players)
+      #print(targets)
   list(players,targets)
 }
 
 
-reward_conf <- function(conf_out){
+reward_conf <- function(conf_out, mode = 'mult'){
   
   #targets <- conf_out[[4]][,.N, by = target]
   
@@ -59,17 +59,29 @@ reward_conf <- function(conf_out){
                 0)
   
   cbts <- length(unique(conf_out[[4]]$player))
-   #print(conf_out)
-  print(slf)
-  print(eny)
-  print(cbts)
-  print(length(unique(conf_out[[1]]$id)))
+  # print(conf_out)
+  # print(slf)
+  # print(eny)
+  # print(cbts)
+  #print(length(unique(conf_out[[1]]$id)))
   # print(target_new)
-  rew <- eny/sum(conf_out[[2]]$str_old) - slf/sum(conf_out[[1]]$str_old) + 
-    nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) + 
-    cbts/length(unique(conf_out[[1]]$id))
+  if(mode == 'ind'){
+    rew <- eny/sum(conf_out[[2]]$str_old) + 
+      nrow(conf_out[[2]][str<10])
+  } else{
+    rew <- ((1 +(sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))) /
+      (1 +(sum(conf_out[[1]]$str_old) - sum(conf_out[[1]]$str)))-1) + 
+      nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+ 
+  #   
+  # rew <- eny/sum(conf_out[[2]]$str_old) - slf/sum(conf_out[[1]]$str_old) + 
+  #   nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+ 
+  }
+    #cbts/length(unique(conf_out[[1]]$id))
   #print(rew)
-  return(rew)
+  rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,
+                        val = ifelse(conf_out[[1]][order(id)]$id %in% conf_out[[4]]$player,1,0))
+  # print(rew_ind)
+  return(list(rew,rew_ind))
 
   }
 

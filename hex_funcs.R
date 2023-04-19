@@ -80,7 +80,7 @@ grad_reward <- function(trans,grad,c = 1){
 }
 
 
-reward_new <- function(trans,grad,grad_reward,c = 1){
+reward_new <- function(trans,grad_reward,mode = 'mult',c = 1){
   
   r <- grad_reward
   
@@ -94,15 +94,16 @@ reward_new <- function(trans,grad,grad_reward,c = 1){
   #r <- nrow(trans[[1]])*-0.05  #For MCTS
   #target[,sp := s] # this command it to add sp column when calculating reward
   #assumes the 'target' doesn't move.  may not work with actual calcs
-  
+  rdt <- data.table(id = trans[[1]]$id, val = 0)
   if(trans[[3]] == TRUE){
     
-    rconf <- reward_conf(trans)
+    rconf <- reward_conf(trans, mode)
     
-    r <- r + rconf
+    r <- r + rconf[[1]]
+    rdt <- rconf[[2]]
   }
   
-  r
+  return(list(r,rdt))
 }
 
 
@@ -202,15 +203,70 @@ conf_check <- function(players,target){
   unique(conf_all)
 } 
 
+
+conf_check2 <- function(players,target){
+  
+  out <- data.table()
+  
+  if(nrow(players) > 0 & nrow(target) > 0){
+    
+    f_vec <- as.vector(sapply(players$sp,
+                              function(x) sum(as.integer(substr(x, 1, 2)), 
+                                              as.integer(substr(x, 3, 4)),
+                                              as.integer(substr(x, 5, 6))))
+    )
+    
+    f_lvl <- as.vector(sapply(players$sp,
+                              function(x) as.integer(substr(x, 5, 6)))
+    )
+    
+    e_vec <- as.vector(sapply(target$sp,
+                              function(x) sum(as.integer(substr(x, 1, 2)), 
+                                              as.integer(substr(x, 3, 4)), 
+                                              as.integer(substr(x, 5, 6))))
+    )
+    
+    e_lvl <- as.vector(sapply(target$sp,
+                              function(x) as.integer(substr(x, 5, 6)))
+    )
+    
+    matches <- lapply(f_vec,find_indices,vec  = e_vec)
+    # print(matches)
+    for(i in 1:length(matches)){
+      
+      if(length(matches[[i]])>0){
+        
+        for(j in 1:length(matches[[i]])){
+          
+          if(abs(f_lvl[[i]] - e_lvl[matches[[i]][[j]]]) <= 1){
+            
+            out_t <- data.table(player = players[i]$id,target = target[matches[[i]][[j]]]$id)
+            
+            out <- rbind(out,out_t)
+          }
+          
+        }
+      }
+      
+    }
+  }
+  return(out)
+}
+
+
+
+find_indices <- function(num, vec) {
+  # Find indices of elements in vec that are plus or minus 2 from num
+  idx <- which(abs(vec - num) == 2 | vec == num)
+  return(idx)
+}
+
 transition_function <- function(players,target){
   
-  if(
-    any(
-      players$sp %in% target$sp,
-      players$s %in% target$sp & players$sp %in% target$s
-    ) == TRUE
-  ) {
-    conf_all <- conf_check(players,target)
+  conf_all <- conf_check2(players,target)
+  
+  if(nrow(conf_all) > 0  ) {
+
     
     
     conf_occ <- TRUE
@@ -273,6 +329,95 @@ transition_function <- function(players,target){
 
 
 
+transition_function2 <- function(plrs,trgt){
+  
+  conf_all <- conf_check2(plrs,trgt)
+  
+  plrs1 <- plrs[,str_old := str]
+
+  trgt1 <- trgt[,str_old := str]
+  
+  if(nrow(conf_all) > 0  ) {
+  
+    conf_occ <- TRUE 
+    confout <- conflict(conf_all,plrs,trgt)
+    plrvec <- paste0(plrs1$sp,plrs1$s)
+    tgtvec <- paste0(trgt1$sp,trgt1$s)
+    
+    # Modify strength based on conflict
+    plrs1[confout[[1]], on = c(id = 'player'),str := str-mod]
+    
+    # Dont allow negative strength
+    plrs1[str < 0, str := 0]
+    
+    # Check for units that attacked into each other
+    plrs1[paste0(s,sp)%in%tgtvec,sp:=s]
+    
+    # Check for units that attacked into stationary
+    plrs1[sp %in% trgt1[s == sp,]$sp,sp := s]
+
+    
+    # Work on targets
+
+    trgt1[confout[[2]], on = c(id = 'target'),str := str-mod]
+    
+    trgt1[str < 0, str := 0]
+    trgt1[paste0(s,sp)%in%plrvec,sp:=s]
+    
+    
+    trgt1[sp %in% plrs1[s == sp,]$sp,sp := s]
+    
+    
+    # Check for units that ended on the same space
+
+
+    
+
+  }else{
+    conf_occ <- FALSE
+  }
+  
+  # Check for units moving into the same space
+  comb <- rbind(plrs1,trgt1)
+  
+  # Sample who gets the space according to strength ratios
+  comb <- comb[, .SD[sample(.N, 1, prob = str_old)], by = sp]
+  
+  # If the unit is not selected by sample, it's returned to original space
+  plrs1[,sp := ifelse(id %in% comb$id,sp,s)]
+  trgt1[,sp := ifelse(id %in% comb$id,sp,s)]
+  
+  
+  # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
+  # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+  allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
+  # print(max(c(psame$un,tsame$un)))
+  # print(psame)
+  # print(tsame)
+  while(max(c(allsame$uno))>1){
+    
+    psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
+    tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+    
+    plrs1[sp %in% c(trgt1$sp,psame[un>1]$sp), sp := s]
+    trgt1[sp %in% c(plrs1$sp,tsame[un>1]$sp), sp := s]
+    
+    
+    # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
+    # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+
+    allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
+    # print(psame)
+    # print(tsame)
+    # print(allsame)
+  }
+  
+  list(plrs1,trgt1,conf_occ,conf_all)
+  
+}
+
+
+
 utility_func <- function(q_lst, state_vec){
   
   s_ind <- which(q_lst$s$s %in% state_vec)
@@ -282,7 +427,7 @@ utility_func <- function(q_lst, state_vec){
 }
 
 
-prob_setup <- function(samep = .675, adjp = .075, adjbp = .05, backp = .025, stayp = 0.05){
+prob_setup <- function(samep = .375, adjp = .225, adjbp = .05, backp = .025, stayp = 0.05){
   
   total <- samep + 2*adjp + 2*adjbp + backp + stayp
   #print(total)
@@ -296,7 +441,7 @@ prob_setup <- function(samep = .675, adjp = .075, adjbp = .05, backp = .025, sta
   adj4_tbl <- data.table(a = c(rep('adj4',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,backp,adjbp,adjp,samep,adjp,adjbp))
   adj5_tbl <- data.table(a = c(rep('adj5',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjbp,backp,adjbp,adjp,samep,adjp))
   adj6_tbl <- data.table(a = c(rep('adj6',7)), nexta = c(paste0("adj",0:6)), p = c(stayp,adjp,adjbp,backp,adjbp,adjp,samep))
-  adj0_tbl <- data.table(a = c(rep('adj0',7)), nexta = c(paste0("adj",0:6)), p = c(1,1/10,1/10,1/10,1/10,1/10,1/10))
+  adj0_tbl <- data.table(a = c(rep('adj0',7)), nexta = c(paste0("adj",0:6)), p = c(.5,1/10,1/10,1/10,1/10,1/10,1/10))
   
   prob_tran <- rbind(adj0_tbl,adj1_tbl,adj2_tbl,adj3_tbl,adj4_tbl,adj5_tbl,adj6_tbl)
   return(prob_tran)

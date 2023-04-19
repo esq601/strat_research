@@ -9,13 +9,21 @@ table_out <- data.table(read_csv("mcts_test_27mar_a.csv"))
 42/3
 
 #write_csv(units_log, 'mcts_test_27feb.csv')
-table_out <- units_log
 
+# new_log <- data.table(read_csv("mcts_test_two_player_05aprh.csv"))
+# units_log$turn <- units_log$turn + 10
+# 
+# units_log <- bind_rows(new_log,units_log)
+table_out <- units_log
+table_init <- copy(table_out)
+
+table_init[turn == 1, c('sp','turn','a') := .(s,0,'adj0')]
+table_out <- rbind(table_init[turn==0],table_out)
 hexdt <- data.table(hexdf2)[,s := pos]
 str(table_out)
 
 hexdt1 <- unique(hexdt[,list(s,x_pos,y_pos)])
-pieces <- hexdt1[table_out, on = 's',list(s,a,id,str,type,turn,x_pos,y_pos)]
+pieces <- hexdt1[table_out, on = c(s = 'sp'),list(s,a,id,str,type,turn,x_pos,y_pos)]
 pieces[type == 'f', image := "f_inf.svg"]
 pieces[type == 'e', image := 'e_inf.svg']
 
@@ -26,7 +34,7 @@ adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
 pieces <- adj_dt[pieces, on = .(a)]
 
 ### testing spoke
-pnew <- pieces[turn == 1]
+pnew <- pieces[turn == 2]
 pnew
 ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = 'transparent') +
@@ -69,7 +77,7 @@ animate(p1)
 
 
 animate(p1, height = 8, width = 10,fps = 10,duration = 30, units = "in", res = 120)
-anim_save('images/test_fight_mcts_twoplayer_a.gif')
+anim_save('images/test_fight_mcts_twoplayer_c.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

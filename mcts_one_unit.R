@@ -70,7 +70,7 @@ rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
 
 q_work <- list(s = data.table(s = paste0(t(units),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
                sa = data.table(sa = paste0(paste0(t(units),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
-               q = list(0), n =list(1), grad_rew = 0)#rew_start)
+               q = list(0),q_ind = list(data.table(id = f_players$id,val = 0)), n =list(1), grad_rew = 0)#rew_start)
 
 
 q_work

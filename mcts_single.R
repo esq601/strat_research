@@ -24,7 +24,7 @@ pose <- df2 %>%
 
 f_players <- data.table(
   id = paste0("inf_",1:numu),
-  s = c('020711','040507'),
+  s = c('040507','060707'),
   #s = posf$pos,
   str = 100,
   
@@ -35,7 +35,7 @@ f_players <- data.table(
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
   id = paste0("eny_",1:nume),
-  s = c('081008','071110'),
+  s = c('070908','080806'),
   #s = pose$pos,
   str = 100,
   
@@ -65,17 +65,17 @@ territory[,lst := Map(list,x_pos,y_pos)]
 unit_trans[[2]]
 rew_start <- grad_reward(trans = unit_trans,territory,c = .25)
 
+
 q_work <- list(s = data.table(s = paste0(t(units),collapse = '')), a = list(rep('adj0',nrow(units[type=='f']))),
                sa = data.table(sa = paste0(paste0(t(units),collapse=''),paste0(rep('adj0',nrow(units[type=='f'])),collapse = ''),collapste = '')), 
-               q = list(0), n =list(1), grad_rew = 0)#rew_start)
-
+               q = list(0),ind_q = list(data.table(id = f_players$id,val = 0)), n =list(1), grad_rew = 0)#rew_start)
 
 q_work
 sim_change <- 1
 
 
 
-selected_a <- c(rep('adj2',nrow(units[type == 'f'])), rep('adj5',nrow(units[type == 'e'])))
+selected_a <- c(rep('adj0',nrow(units[type == 'f'])), rep('adj5',nrow(units[type == 'e'])))
 
 
 
@@ -146,7 +146,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
                    out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                              legal_a = legal_acts,terr_loc=territory,actions = actions,
                                              c = 20,
-                                             n_iter = 500, depth = 8)  
+                                             n_iter = 10, depth = 8)  
                    out <- out[-1,]
                    out
                  }
@@ -164,8 +164,8 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10){
   
   #units[,a := NULL]
   out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                       q=q_work,c =2*nrow(units[type == 'f']),
-                       n_iter = 1000, depth =7, single_out = out1, actions=actions)
+                       q=q_work,c =.2,
+                       n_iter = 500, depth =7, single_out = out1, actions=actions)
   
   q_work <- out[[1]]
   out[[2]]
