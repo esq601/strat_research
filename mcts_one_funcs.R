@@ -7,53 +7,63 @@ cl <- makeCluster(cores[1]/2) #not to overload your computer
 registerDoParallel(cl)
 cores
 
-execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf, depth, disc = 0.95) {
+execute_one_action <- function(state,actions,grad,q_lst,c,
+                           lasta,act_dt, probdf, depth,prob_b,
+                           disc = 0.95,prob_lst,leg_lst) {
   
   # Only current states are subsetted
   
+  t1 <- Sys.time()
+  df_t <- data.table()
   sa_dt <- lasta[type == 'e',.(s,a)]
-  move <- actions[state[,a := NULL], on = .(s)]
-  #print(sa_dt)
-  actvec <- vector()
+  
   eny_row <- nrow(lasta[type =='e'])
   eny_a <- lasta[type == 'e']
   lasta <- lasta[type == 'f']
+  lasta$sid <- paste0(lasta$id,lasta$s)
   
-
-  next_state <- NA
+  #### New select function ####
   
-  move <- actions[state, on = .(s)]
+  t1 <- Sys.time()
   
-  actvec <- sample(move[type == 'f']$a,1)
   
-  for(i in 1:nrow(sa_dt)){
-    #print(eny_a)
-    act_select <- belief_fun(action = sa_dt[[i,2]],state = sa_dt[[i,1]],actions,probdf,act_dt,next_state)
+  actvec_f <- apply(lasta,FUN = selfun,MARGIN = 1,
+                    prob = NULL, legal_a = leg_lst, rand = TRUE)
+  
+  s_act <- data.table(s = lasta$s, a = actvec_f)
+  
+  sp_sel <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
+  
+  # s_act <- data.table(s = lasta$s, a = actvec)
+  # dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
+  
+  act_sel <- unlist(lapply(sa_dt$a,belfun, plist = prob_lst))
+  
+  s_act <- data.table(s = sa_dt$s, a = act_sel)
+  dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
+  
+  while(class(dtout) == 'list' | any(duplicated(dtout)) == TRUE){
+    #print('working!')
+    act_sel <- unlist(lapply(sa_dt$a,belfun, plist = prob_lst))
     
-    
-    next_state <- c(next_state,actions[s == sa_dt[[i,1]] & a == act_select]$sp)
-    
-    #print(act_select)
-    actvec <- c(actvec,act_select)
+    s_act <- data.table(s = sa_dt$s, a = act_sel)
+    dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
   }
+  
+  actvec <- c(actvec_f,act_sel)
+  sp_sel <- c(sp_sel, dtout)
+  
+  
   
   # esel <- state[type == 'e', .(s,id)]
   # esel$a <- 'adj0'
   
-  movesel <- data.table(s = state$s, a = actvec,
-                        id = state$id)
+  move <- state
+  move$a <- actvec
+  move$sp <- sp_sel
   
-  #movesel <- rbind(movesel,esel)
-  
-  move <- move[movesel, on = .(s,a,id)]
-  
-  #move <- rbind(move, )
-  
-  
-  s_vec <- paste0(t(move[type == 'f',list(id,s)]),collapse = '')
-  sa_vec <- paste0(paste0(t(move[type == 'f',list(id,s)]),collapse = ''),
-                   paste0(t(move[type=='f',list(a)]),collapse = ''),
-                   collapse = '')
+  s_vec <- paste0(lasta$id,lasta$s,collapse = '')
+  sa_vec <- paste0(lasta$id,lasta$s,actvec_f,collapse = '')
   ### If a in (s,a) select max UCB
   # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(move[,list(id,s,str,type)]),
   #                                                    t(move[type=='f',list(a)]))))
@@ -92,7 +102,7 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
     
     movenew <- actions[movenew, on = .(s,a)]
     
-    trans <- transition_function(movenew,move[type == 'e'])
+    trans <- transition_function2(movenew,move[type == 'e'])
     
     # grad_rew <- q_lst$grad_rew[matches_s[[which.max(ucb)]]]
     # 
@@ -107,11 +117,12 @@ execute_one_action <- function(state,actions,grad,q_lst,c,act_dt, lasta, probdf,
     
     type_act <- 'new'
     
-    trans <- transition_function(move[type == 'f'],move[type == 'e'])
+    trans <- transition_function2(move[type == 'f'],move[type == 'e'])
     # print(trans)
     grad_rew <- 0#grad_reward(trans, grad, c = .25)
     
     rew <- reward_new(trans,grad_rew, mode = 'ind')
+    
     typeout <- 'new'
   }
   
@@ -124,15 +135,15 @@ q_one_update <- function(q_lst, transition, gamma = 0.95,j) {
   
   trigger <- F
   
-  transition[[1]][order(id)]
+  #transition[[1]][order(id)]
   #print(transition)
-  s_old_vec <- paste0(t(transition[[1]][type == 'f',list(id,s)]),collapse = '')
+  friendlies <- transition[[1]][type == 'f']
   
-  s_vec <- paste0(t(transition[[1]][type == 'f',list(id,sp)]),collapse = '')
+  s_old_vec <- paste0(friendlies$id,friendlies$s,collapse = '')
   
-  sa_vec <- paste0(paste0(t(transition[[1]][type == 'f',list(id,s)]),collapse = ''),
-                   paste0(t(transition[[1]][type=='f',list(a)]),collapse = ''),
-                   collapse = '')
+  s_vec <- paste0(friendlies$id,friendlies$sp,collapse = '')
+  
+  sa_vec <- paste0(friendlies$id,friendlies$s,friendlies$a, collapse = '')
   
   # matches <- sapply(q_lst$sa,matchfun, new = as.vector(c(t(transition[[1]][,list(id,s,str_old,type)]),
   #                                                        t(transition[[1]][type=='f',list(a)]))))
@@ -175,7 +186,7 @@ q_one_update <- function(q_lst, transition, gamma = 0.95,j) {
     
     q_lst$n[outnew] <- list(q_lst$n[[outnew]]+1)
     
-    val <- (val + gamma^j * u_ind)
+    val <- (val + gamma * u_ind)
     
     q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
     
@@ -195,10 +206,13 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
   prob_tran <- prob_setup()
   time_stamp <- Sys.time()
   
-  q <- list(s = data.table(s = paste0(t(unit_obj),collapse = '')), 
-            a = list(rep('adj0',nrow(unit_obj[type=='f']))),
-            sa = data.table(sa = paste0(paste0(t(unit_obj),collapse=''),
-                                        paste0(rep('adj0',nrow(unit_obj[type=='f'])),collapse = ''),collapse = '')), 
+prob_tran
+  prob_ls <- split(prob_tran, by = 'a')
+  leg_ls <- split(data.table(legal_a), by = 's')
+  
+  q <- list(s = data.table(s = unit_obj[type == 'f']$s), 
+            a = list('adj0'),
+            sa = data.table(sa = paste0(unit_obj[type == 'f']$s,'adj0',collapse = '')), 
             q = list(0), n =list(1), grad_rew = 0)
   
   df_log <- data.table()
@@ -232,7 +246,8 @@ simulate_one_mcts <- function(unit_obj,last_a, legal_a,terr_loc,actions, c = 5, 
       time <- Sys.time()
       out <- execute_one_action(state=input_state,actions = legal_a,grad = terr_loc,
                                 q_lst=q,c=c,act_dt=actdt, lasta = input_state,
-                                probdf = prob_tran, depth = j, disc = 0.95)
+                                probdf = prob_tran, depth = j, disc = 0.95,
+                                prob_lst = prob_ls, leg_lst = leg_ls)
       
       #print(c("Time Execute", Sys.time()-time))
       

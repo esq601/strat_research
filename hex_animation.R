@@ -3,10 +3,10 @@ library(ggimage)
 library(data.table)
 
 source('hex_setup.R')
-table_out <- data.table(read_csv("mcts_test_27mar_a.csv"))
+table_out <- data.table(read_csv("mcts_test_two_player_25apr1.csv"))
 
-70-28
-42/3
+#70-28
+#42/3
 
 #write_csv(units_log, 'mcts_test_27feb.csv')
 
@@ -14,7 +14,7 @@ table_out <- data.table(read_csv("mcts_test_27mar_a.csv"))
 # units_log$turn <- units_log$turn + 10
 # 
 # units_log <- bind_rows(new_log,units_log)
-table_out <- units_log
+#table_out <- units_log
 table_init <- copy(table_out)
 
 table_init[turn == 1, c('sp','turn','a') := .(s,0,'adj0')]
@@ -34,10 +34,10 @@ adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
 pieces <- adj_dt[pieces, on = .(a)]
 
 ### testing spoke
-pnew <- pieces[turn == 2]
+pnew <- pieces[turn == 3]
 pnew
 ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
-  geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = 'transparent') +
+  geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
   geom_tile(data = pnew,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
   geom_spoke(data =pnew, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
@@ -45,6 +45,7 @@ ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_image(data=pnew, aes(image = image)) +
   scale_fill_distiller(type = "div",direction = 1,limits = c(0,1), palette = "RdYlGn")  +
   scale_color_manual(breaks = c('e','f'), values = c('darkred','darkgreen')) +
+  #coord_cartesian(xlim = c(0,20)) +
   #coord_equal(xlim = c(5,25),ylim = c(0,25)) +
   # scale_fill_manual(breaks = c('enemy','friendly','non','conflict'), 
   #                   values = c('darkred','lightgreen','transparent','orange')) +
@@ -52,10 +53,10 @@ ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
 
 
 
-
+max(pieces$x_pos)
 ### normal animation
 p1 <- ggplot(pieces, aes(x = x_pos, y = y_pos,group = id)) +
-  geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = 'transparent') +
+  geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
   geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
   geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
@@ -64,11 +65,15 @@ p1 <- ggplot(pieces, aes(x = x_pos, y = y_pos,group = id)) +
   scale_fill_distiller(type = "div",direction = 1,limits = c(0,100), palette = "RdYlGn")  +
   scale_color_manual(breaks = c('e','f'), values = c('darkred','darkgreen')) +
   #coord_equal(xlim = c(5,25),ylim = c(0,20)) +
-  coord_equal() +
+  coord_equal(xlim = c(0,max(pieces$x_pos)+1)) +
   # scale_fill_manual(breaks = c('enemy','friendly','non','conflict'), 
   #                   values = c('darkred','lightgreen','transparent','orange')) +
   theme_void() +
+
   labs(title = paste("Turn {closest_state}")) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  ) +
   gganimate::transition_states(turn, transition_length = 1, state_length = 3,wrap = FALSE)
 
 
@@ -76,8 +81,8 @@ animate(p1)
 
 
 
-animate(p1, height = 8, width = 10,fps = 10,duration = 30, units = "in", res = 120)
-anim_save('images/test_fight_mcts_twoplayer_c.gif')
+animate(p1, height = 6, width = 9,fps = 20,duration = 30, units = "in", res = 160)
+anim_save('images/test_fight_mcts_twoplayer_05aprtest3.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

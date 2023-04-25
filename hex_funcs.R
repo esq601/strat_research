@@ -36,7 +36,7 @@ trunc_func <- function(val,floor=-3, ceiling = 3){
   return(out)
 }
 
-trunc_func(-1.72)
+
 grad_func <- function(terr_df,unit_df){
   #print(terr_df)
   #print(terr_df_x)
@@ -210,40 +210,51 @@ conf_check2 <- function(players,target){
   
   if(nrow(players) > 0 & nrow(target) > 0){
     
-    f_vec <- as.vector(sapply(players$sp,
-                              function(x) sum(as.integer(substr(x, 1, 2)), 
-                                              as.integer(substr(x, 3, 4)),
-                                              as.integer(substr(x, 5, 6))))
-    )
+    f_vec <- lapply(players$sp,
+                    function(x) c(as.integer(substr(x, 1, 2)), 
+                                  as.integer(substr(x, 3, 4)),
+                                  as.integer(substr(x, 5, 6))))
     
-    f_lvl <- as.vector(sapply(players$sp,
-                              function(x) as.integer(substr(x, 5, 6)))
-    )
+    e_vec <- lapply(target$sp,
+                    function(x) c(as.integer(substr(x, 1, 2)), 
+                                  as.integer(substr(x, 3, 4)),
+                                  as.integer(substr(x, 5, 6))))
     
-    e_vec <- as.vector(sapply(target$sp,
-                              function(x) sum(as.integer(substr(x, 1, 2)), 
-                                              as.integer(substr(x, 3, 4)), 
-                                              as.integer(substr(x, 5, 6))))
-    )
-    
-    e_lvl <- as.vector(sapply(target$sp,
-                              function(x) as.integer(substr(x, 5, 6)))
-    )
-    
-    matches <- lapply(f_vec,find_indices,vec  = e_vec)
-    # print(matches)
+    # f_vec <- as.vector(sapply(players$sp,
+    #                           function(x) sum(as.integer(substr(x, 1, 2)), 
+    #                                           as.integer(substr(x, 3, 4)),
+    #                                           as.integer(substr(x, 5, 6))))
+    # )
+    # 
+    # f_lvl <- as.vector(sapply(players$sp,
+    #                           function(x) as.integer(substr(x, 5, 6)))
+    # )
+    # 
+    # e_vec <- as.vector(sapply(target$sp,
+    #                           function(x) sum(as.integer(substr(x, 1, 2)), 
+    #                                           as.integer(substr(x, 3, 4)), 
+    #                                           as.integer(substr(x, 5, 6))))
+    # )
+    # 
+    # e_lvl <- as.vector(sapply(target$sp,
+    #                           function(x) as.integer(substr(x, 5, 6)))
+    # )
+    # print(f_vec)
+    # print(f_lvl)
+    # print(e_vec)
+    # print(e_lvl)
+    # matches <- lapply(f_vec,find_indices,vec  = e_vec)
+    matches <- compare_lists(f_vec, e_vec)
+    #print(matches)
     for(i in 1:length(matches)){
       
       if(length(matches[[i]])>0){
         
         for(j in 1:length(matches[[i]])){
           
-          if(abs(f_lvl[[i]] - e_lvl[matches[[i]][[j]]]) <= 1){
-            
-            out_t <- data.table(player = players[i]$id,target = target[matches[[i]][[j]]]$id)
-            
-            out <- rbind(out,out_t)
-          }
+          out_t <- data.table(player = players[i]$id,target = target[matches[[i]][[j]]]$id)
+          
+          out <- rbind(out,out_t)
           
         }
       }
@@ -262,8 +273,10 @@ find_indices <- function(num, vec) {
 }
 
 transition_function <- function(players,target){
+
   
   conf_all <- conf_check2(players,target)
+  
   
   if(nrow(conf_all) > 0  ) {
 
@@ -276,7 +289,11 @@ transition_function <- function(players,target){
     target_noconf <- target[!(id %in% conf_all$target)]
     target_noconf[,str_old := str]
     
+    t1 <- Sys.time()
     conf_out <- conflict(conf_all,players,target)
+    
+    
+    t1 <- Sys.time()
     
     players_conf <- players[conf_out[[1]], on = "id == player"]
     #print('yo')
@@ -311,7 +328,10 @@ transition_function <- function(players,target){
       players_out[sp %in% target_out$sp]$sp <- players_out[sp %in% target_out$sp]$s
       
     } 
+    
   } else {
+    
+    t1 <- Sys.time()
     conf_occ <- FALSE
     conf_all <- data.table()
     
@@ -320,10 +340,10 @@ transition_function <- function(players,target){
     
     target_out <- target[!(id %in% conf_all$target)]
     target_out[,str_old := str]
-    
+    df_t <- rbind(df_t, data.table(event = 'noconf',t = Sys.time()-t1))
   }
   
-  list(players_out,target_out,conf_occ,conf_all)
+  list(players_out,target_out,conf_occ,conf_all,df_t)
   
 }
 
@@ -331,16 +351,27 @@ transition_function <- function(players,target){
 
 transition_function2 <- function(plrs,trgt){
   
+  df_t <- data.table()
+  
+  t1 <- Sys.time()
+  
   conf_all <- conf_check2(plrs,trgt)
   
+  df_t <- rbind(df_t, data.table(event = 'conf_check2',t = Sys.time()-t1))
+  print(conf_all)
   plrs1 <- plrs[,str_old := str]
 
   trgt1 <- trgt[,str_old := str]
   
   if(nrow(conf_all) > 0  ) {
-  
+    t1 <- Sys.time()
+    
     conf_occ <- TRUE 
     confout <- conflict(conf_all,plrs,trgt)
+    
+    df_t <- rbind(df_t, data.table(event = 'conflict',t = Sys.time()-t1))
+    
+    t1 <- Sys.time()
     plrvec <- paste0(plrs1$sp,plrs1$s)
     tgtvec <- paste0(trgt1$sp,trgt1$s)
     
@@ -370,49 +401,55 @@ transition_function2 <- function(plrs,trgt){
     
     # Check for units that ended on the same space
 
-
+    df_t <- rbind(df_t, data.table(event = 'restofconf',t = Sys.time()-t1))
+    
     
 
   }else{
     conf_occ <- FALSE
   }
-  
+  t1 <- Sys.time()
   # Check for units moving into the same space
-  comb <- rbind(plrs1,trgt1)
-  
-  # Sample who gets the space according to strength ratios
-  comb <- comb[, .SD[sample(.N, 1, prob = str_old)], by = sp]
-  
-  # If the unit is not selected by sample, it's returned to original space
-  plrs1[,sp := ifelse(id %in% comb$id,sp,s)]
-  trgt1[,sp := ifelse(id %in% comb$id,sp,s)]
-  
-  
-  # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
-  # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
-  allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
-  # print(max(c(psame$un,tsame$un)))
-  # print(psame)
-  # print(tsame)
-  while(max(c(allsame$uno))>1){
+  if(any(duplicated(c(plrs1$sp,trgt1$sp))) == TRUE){
+    comb <- rbind(plrs1,trgt1)
     
-    psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
-    tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+    # Sample who gets the space according to strength ratios
+    comb <- comb[, .SD[sample(.N, 1, prob = str_old)], by = sp]
     
-    plrs1[sp %in% c(trgt1$sp,psame[un>1]$sp), sp := s]
-    trgt1[sp %in% c(plrs1$sp,tsame[un>1]$sp), sp := s]
+    # If the unit is not selected by sample, it's returned to original space
+    plrs1[,sp := ifelse(id %in% comb$id,sp,s)]
+    trgt1[,sp := ifelse(id %in% comb$id,sp,s)]
     
     
     # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
     # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
-
     allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
+    # print(max(c(psame$un,tsame$un)))
     # print(psame)
     # print(tsame)
-    # print(allsame)
-  }
+    while(max(c(allsame$uno))>1){
+      
+      psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
+      tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+      
+      plrs1[sp %in% c(trgt1$sp,psame[un>1]$sp), sp := s]
+      trgt1[sp %in% c(plrs1$sp,tsame[un>1]$sp), sp := s]
+      
+      
+      # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
+      # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
+      
+      allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
+      # print(psame)
+      # print(tsame)
+      # print(allsame)
+    }
+  } 
+
+  df_t <- rbind(df_t, data.table(event = 'movesame_chk',t = Sys.time()-t1))
   
-  list(plrs1,trgt1,conf_occ,conf_all)
+  
+  list(plrs1,trgt1,conf_occ,conf_all,df_t)
   
 }
 
@@ -448,3 +485,20 @@ prob_setup <- function(samep = .375, adjp = .225, adjbp = .05, backp = .025, sta
 }
 ptest <- prob_setup()
 
+
+compare_lists <- function(list1, list2) {
+  lapply(list1, function(x) {
+    # create a boolean vector to store the comparison results for each element in list2
+    which(sapply(list2, function(y) {
+      # calculate the maximum difference between each element of x and y
+      max_diff1 <- max(abs(x-y))
+      #max_diff2 <- max(abs(diff(y)))
+      
+      # calculate the difference between the sums of x and y
+      sum_diff <- abs(sum(x) - sum(y))
+      
+      # return a boolean indicating if the criteria are met
+      sum_diff <= 2 & max_diff1 <=1
+    }))
+  })
+}

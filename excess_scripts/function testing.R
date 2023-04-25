@@ -1,6 +1,6 @@
 source('mcts_functs.R')
 source('mcts_one_funcs.R')
-library(DirichletReg)
+
 #### start the thing
 
 single_a <- c(selected_a[2],selected_a[(length(selected_a)-nrow(e_target)+1):length(selected_a)])
@@ -216,3 +216,74 @@ test <- data.table(i = c(1,2,3,4), j = c('a','b','c','d'))
 for(i in 1:4){
   print(test[i])
 }
+
+
+
+
+
+prob_dt <- prob_setup()
+leg_dt <- data.table(adj_df)
+
+prob_ls <- split(prob_dt, by = 'a')
+leg_ls <- split(data.table(leg_dt), by = 's')
+
+state <- '141608'
+start_a <- c('adj0','adj6','adj4','adj5')
+dt_out <- data.table()
+for(a in start_a){
+  for(i in 1:1000){
+    new_state <- state
+    a
+    for (depth in 1:10){
+      
+      lst_legal <- lapply(prob_ls, function(dt) {
+        dt[dt$nexta %in% leg_ls[[new_state]]$a, ]
+      })
+      
+      new_a <- belfun(a,lst_legal)
+      
+      new_state <- leg_ls[[new_state]][a == new_a]$sp
+      dt_out <- rbind(dt_out,data.table(starta  = a, newstate = new_state, newa = new_a))
+    }
+  }
+}
+
+
+count_dt <- dt_out[,.N,by = c('starta','newstate')]
+
+count_dt[is.na(N),N :=0]
+
+hexdf2a <- hexdf2 %>%
+  left_join(count_dt, by = c('pos'='newstate')) %>%
+  as.data.table()
+#hexdf2a[is.na(N),N:=0]
+hexdf3 <- data.table()
+for(a in start_a){
+  newhex <- hexdf2
+  newhex$starta <- a
+  hexdf3 <- rbind(hexdf3,newhex)
+}
+
+direcst <- c('Stationary','Northwest','West','Southwest')
+names(direcst) <- c('adj0','adj4','adj5','adj6')
+
+ggplot(hexdf2a[!is.na(starta)], aes (x=x_h, y = y_h)) +
+  geom_polygon(data = hexdf3, color = 'black',aes(group = pos),fill = 'grey90') +
+  
+  #annotate('polygon', color = 'black', group = pos) +
+  geom_polygon(color = 'black',aes(group = pos, fill = log(N))) +
+geom_point(data = hexdf3[pos == state], aes(x = x_pos, y = y_pos), size = 3) +
+  #geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
+  coord_equal() +
+  scale_fill_distiller(palette = 14, direction = 1) +
+  theme_void() +
+  labs(
+    title = "Distribution of Movement Belief",
+    subtitle = 'Determined by Previous Movement Direction'
+    ) +
+  facet_wrap(~starta,
+             labeller = labeller(starta = direcst ))
+
+
+ggsave('images/belief_dist.jpeg',width = 10, height = 6, dpi = 320)
+unique(hexdf2a$starta)

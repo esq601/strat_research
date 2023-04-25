@@ -35,18 +35,23 @@ ggsave('hex_territory.png',width = 5,height = 4, units = 'in')
 
 
 ggplot(hexdf2, aes (x=x_h, y = y_h)) +
-  geom_polygon(color = 'black',aes(group = pos,fill = goals)) +
+  geom_polygon(color = 'black',aes(group = pos, fill = goals)) +
   geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
   coord_equal() +
-  scale_fill_manual(breaks = c('area1','area2','area3'), 
-                    values = c('#4a5a78','#7d97c7','transparent')) +
-  theme_void()
+  scale_fill_identity() +
+  theme_void() +
+  labs(
+    title = "Geography of Conflict Area",
+    subtitle = "With Key Cities"
+  )
+
+ggsave('images/final_area.jpeg', width = 9, height = 6, dpi = 320)
 
 #Plot with position codes
 head(hexdf2)
 
 hexdf2a <- hexdf2 %>%
-  mutate(new = sqrt(x^2 + z^2 +y^2))
+  mutate(new = x+y+z)
 
 ggplot(hexdf2a  , aes(x = x_pos, y = y_pos)) +
   geom_polygon(color = 'black',aes(group = pos,x=x_h, y = y_h), fill = 'transparent') +
