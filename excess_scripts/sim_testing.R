@@ -1,7 +1,9 @@
 
-out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                     q=q_work,c =2,
-                     n_iter = 1*7^nrow(units[type == 'f']), depth =5, single_out = out_single, actions=actions)
+out <- simulate_mcts(unit_bg1,selected_a[c(1:3,7:12)],legal_a = legal_acts,terr_loc=territory, 
+                     q=q_work1,c =0.2,
+                     n_iter = 1000, depth =8, single_out = out_single, actions=actions,
+                     k_terr = key_tern1)
+(out[[2]][order(-q)])
 df <- out[[4]]
 
 

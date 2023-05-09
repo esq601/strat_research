@@ -96,17 +96,17 @@ find_move <- function(current_id, target_id) {
     c2 <- substr(id, 3, 4)
     c3 <- substr(id, 5, 6)
     
-    if (move == 'right') {
+    if (move == 'adj2') {
       return(paste0(add_or_subtract(c1, 1), add_or_subtract(c2, 1), c3))
-    } else if (move == 'upright') {
+    } else if (move == 'adj3') {
       return(paste0(c1, add_or_subtract(c2, 1), add_or_subtract(c3, 1)))
-    } else if (move == 'upleft') {
+    } else if (move == 'adj4') {
       return(paste0(add_or_subtract(c1, -1), c2, add_or_subtract(c3, 1)))
-    } else if (move == 'left') {
+    } else if (move == 'adj5') {
       return(paste0(add_or_subtract(c1, -1), add_or_subtract(c2, -1), c3))
-    } else if (move == 'downleft') {
+    } else if (move == 'adj6') {
       return(paste0(c1, add_or_subtract(c2, -1), add_or_subtract(c3, -1)))
-    } else if (move == 'downright') {
+    } else if (move == 'adj1') {
       return(paste0(add_or_subtract(c1, 1), c2, add_or_subtract(c3, -1)))
     } else {
       return(NULL)
@@ -114,20 +114,29 @@ find_move <- function(current_id, target_id) {
   }
   
   find_shortest_distance <- function(start_id, end_id) {
-    moves <- c('right', 'upright', 'upleft', 'left', 'downleft', 'downright')
+    moves <- c('adj2', 'adj3', 'adj4', 'adj5', 'adj6', 'adj1')
     min_distance <- Inf
+    
     best_move <- ""
     
-    for (move in moves) {
-      next_id <- apply_move(start_id, move)
-      distance <- abs(as.integer(substr(next_id, 1, 2)) - as.integer(substr(end_id, 1, 2))) +
-        abs(as.integer(substr(next_id, 3, 4)) - as.integer(substr(end_id, 3, 4))) +
-        abs(as.integer(substr(next_id, 5, 6)) - as.integer(substr(end_id, 5, 6)))
+    for(end in end_id){
       
-      if (distance < min_distance) {
-        min_distance <- distance
-        best_move <- move
+      for (move in moves) {
+        next_id <- apply_move(start_id, move)
+        distance <- abs(as.integer(substr(next_id, 1, 2)) - as.integer(substr(end, 1, 2))) +
+          abs(as.integer(substr(next_id, 3, 4)) - as.integer(substr(end, 3, 4))) +
+          abs(as.integer(substr(next_id, 5, 6)) - as.integer(substr(end, 5, 6)))
+        
+        if (distance < min_distance) {
+          min_distance <- distance
+          best_move <- move
+        }
       }
+    }
+
+    
+    if(start_id %in% end_id){
+      best_move <- 'adj0'
     }
     return(best_move)
   }
@@ -135,7 +144,18 @@ find_move <- function(current_id, target_id) {
   return(find_shortest_distance(current_id, target_id))
 }
 
-current_id <- "070706"
-target_id <- "070603"
+current_id <- "081109"
+target_id1 <- c('040911',"070504")
 move <- find_move(current_id, target_id)
 print(move)
+
+
+locs <- c('040608','081210')
+
+
+vec <- as.vector(sapply(legal_acts$s, FUN = find_move, target_id = key_tern$s))
+legal2 <- unique(data.table(s = legal_acts$s,a = vec))
+
+units[type == 'e']
+left_join(units[type == 'e'],legal2, by = "s")$a
+legalt2 <- split(legal2, by = 's')

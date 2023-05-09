@@ -52,22 +52,24 @@ target <- testturn[type =='e',c('id','s','a','str')]
 target <- legal_acts[target, on = .(s,a)]
 target <- target[,c('id','s','sp','str')]
 
-players <- data.table(id = c('inf1','inf2','inf3'),s = c('070908','081109','040504'),
-                      sp = c('010101','040504','050505'),str = c(100,100,90))
-target <- data.table(id = c('eny1','eny2'),s = c('020202','050505'), sp = c('030303','040504'),
+
+
+players <- data.table(id = c('inf1','inf2'),s = c('060707','040507'),
+                      sp = c('060707','050607'),str = c(32,100))
+target <- data.table(id = c('eny1','eny2'),s = c('070807','060808'), sp = c('060808','060707'),
                      str = c(100,100))
 
+terr <- data.table(s = c('060707'),value = c(1), type = c('f'))
 
 nrow(conf_check(players,target))
 
 test <- conf_check2(players,target)
 test
 
-trans <- transition_function(players,target)
-trans
-
-trans2 <- transition_function2(players,target)
+trans2 <- transition_function2(players,target, key_terrain = terr)
 trans2
+gradrew <- sum(trans2[[6]][type == 'f']$value) -sum(trans2[[6]][type == 'e']$value)
+reward_new(trans2,gradrew)
 
 test <- paste0(players$s,players$sp)
 teste <- paste0(target$sp,target$s)
@@ -287,3 +289,45 @@ geom_point(data = hexdf3[pos == state], aes(x = x_pos, y = y_pos), size = 3) +
 
 ggsave('images/belief_dist.jpeg',width = 10, height = 6, dpi = 320)
 unique(hexdf2a$starta)
+
+
+
+##### New Belief function #####
+
+dttest <- data.table(s = c('051011','060909'),lasta = c('adj4','adj6'))
+
+a
+dttest[2,]$lasta <- 'boobs'
+probs <- prob_setup()
+legal_acts
+
+
+probsplit <- split(probs,by = 'a')
+legsplit <- split(legal_acts, by = 's')
+
+probtest <- probsplit[[dttest[[1,2]]]][nexta %in% legsplit[[dttest[[1,1]]]]$a]
+
+sample(probtest[[2]],1,prob = probtest[[3]])
+
+
+belfun2 <- function(df,plist,leg_list){
+  probtest <- probsplit[[df[[2]]]][nexta %in% legsplit[[df[[1]]]][[2]]]
+  
+  sample(probtest[[2]],1,prob = probtest[[3]])
+}
+
+selfun2 <- function(state,prob,legal_a,rand){
+  
+  if(is.null(prob[[state[[6]]]])==TRUE | sum(prob[[state[[6]]]]$q) == 0 | rand == TRUE){
+    
+    sample(legal_a[[state[[2]]]]$a,1)
+    
+  } else{
+    
+    sample(prob[[state[[6]]]]$a,1,replace = TRUE,prob =prob[[state[[6]]]]$n )
+    
+  }
+}
+belfun2(dttest[2],probsplit,legsplit)       
+
+apply(dttest,FUN = belfun2,MARGIN = 1,plist = probsplit,leg_list = legsplit)

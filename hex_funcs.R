@@ -80,7 +80,8 @@ grad_reward <- function(trans,grad,c = 1){
 }
 
 
-reward_new <- function(trans,grad_reward,mode = 'mult',c = 1){
+
+reward_new <- function(trans,grad_reward,mode = 'mult'){
   
   r <- grad_reward
   
@@ -95,12 +96,20 @@ reward_new <- function(trans,grad_reward,mode = 'mult',c = 1){
   #target[,sp := s] # this command it to add sp column when calculating reward
   #assumes the 'target' doesn't move.  may not work with actual calcs
   rdt <- data.table(id = trans[[1]]$id, val = 0)
-  if(trans[[3]] == TRUE){
-    
+  if(trans[[3]] == TRUE ){
+
     rconf <- reward_conf(trans, mode)
-    
-    r <- r + rconf[[1]]
-    rdt <- rconf[[2]]
+    # print(trans)
+    # print(rconf)
+    if(mode == 'mult') {
+      r <- .2*r + .8*rconf[[1]]
+      
+      rdt <- rconf[[2]]
+    } else {
+      r <- .5* r + .5* rconf[[1]]
+      rdt <- rconf[[2]]
+    }
+
   }
   
   return(list(r,rdt))
@@ -154,54 +163,6 @@ gradient_function <- function(players,target){
 }
 
 
-
-conf_check <- function(players,target){
-  
-  conf_all <- data.table(player=character(),target=character())
-  #print(players)
-  #print(target)
-  swap <- players[target , on = .(sp == s , s == sp),nomatch = 0, allow.cartesian = TRUE]
-  same <- players[target, on = 'sp', nomatch = 0, allow.cartesian = TRUE]
-  def1 <- players[target , on = .(sp == s ),nomatch = 0, allow.cartesian = TRUE]
-  def2 <- target[players , on = .(sp == s ),nomatch = 0, allow.cartesian = TRUE]
-  
-  if(nrow(swap) > 0){
-    
-    #print('here')
-    atkrs <- data.table(player = swap$id,
-                        target = swap$i.id )
-    
-    target[id %in% atkrs$target ,]$sp <- target[id %in% atkrs$target,]$s
-    players[id %in% atkrs$player,]$sp <- players[id %in% atkrs$player,]$s
-    
-    conf_all <- rbind(conf_all,atkrs)
-  }
-  
-  if(nrow(same) > 0) {
-    
-    atkrs_same <- data.table(player = same$id,
-                             target = same$i.id )
-    
-    conf_all <- rbind(conf_all, atkrs_same)
-  }
-  
-  
-  if(nrow(def1) > 0) {
-    dfenders <- data.table(player = def1$id,
-                           target = def1$i.id )
-    
-    conf_all <-rbind(conf_all, dfenders)
-  }
-  
-  if(nrow(def2) > 0) {
-    dfenders2 <- data.table(player = def2$i.id,
-                            target = def2$id )
-    
-    conf_all <- rbind(conf_all, dfenders2)
-  }
-  
-  unique(conf_all)
-} 
 
 
 conf_check2 <- function(players,target){
@@ -272,84 +233,10 @@ find_indices <- function(num, vec) {
   return(idx)
 }
 
-transition_function <- function(players,target){
-
-  
-  conf_all <- conf_check2(players,target)
-  
-  
-  if(nrow(conf_all) > 0  ) {
-
-    
-    
-    conf_occ <- TRUE
-    players_noconf <- players[!(id %in% conf_all$player)]
-    players_noconf[,str_old := str]
-    
-    target_noconf <- target[!(id %in% conf_all$target)]
-    target_noconf[,str_old := str]
-    
-    t1 <- Sys.time()
-    conf_out <- conflict(conf_all,players,target)
-    
-    
-    t1 <- Sys.time()
-    
-    players_conf <- players[conf_out[[1]], on = "id == player"]
-    #print('yo')
-    #print(players_conf)
-    #players_conf$str_old <- players_conf$str
-    #players_conf$str <- max(0,players_conf$str-players_conf$mod)
-    players_conf[,c("str_old","str"):= .(str,str-mod)]
-    players_conf[str < 0, str := 0]
-    players_conf[,mod:= NULL]
-    players_conf[,sp := s]
-    
-    #print(players_conf)
-    players_out <- rbind(players_noconf,players_conf)
-    
-    target_conf <- target[conf_out[[2]], on = "id == target"]
-    target_conf[,c("str_old","str"):= .(str,str-mod)]
-    target_conf[str < 0, str := 0]
-    target_conf[,mod:= NULL]
-    target_conf[,sp := s]
-    target_out <- rbind(target_noconf,target_conf)
-    
-    
-    coinflip <- runif(1)
-    #print('coinflip')
-    
-    if(coinflip > .5){
-      
-      target_out[sp %in% players_out$sp]$sp <- target_out[sp %in% players_out$sp]$s
-      
-    } else {
-      #print('broken')
-      players_out[sp %in% target_out$sp]$sp <- players_out[sp %in% target_out$sp]$s
-      
-    } 
-    
-  } else {
-    
-    t1 <- Sys.time()
-    conf_occ <- FALSE
-    conf_all <- data.table()
-    
-    players_out <- players[!(id %in% conf_all$player)]
-    players_out[,str_old := str]
-    
-    target_out <- target[!(id %in% conf_all$target)]
-    target_out[,str_old := str]
-    df_t <- rbind(df_t, data.table(event = 'noconf',t = Sys.time()-t1))
-  }
-  
-  list(players_out,target_out,conf_occ,conf_all,df_t)
-  
-}
 
 
 
-transition_function2 <- function(plrs,trgt){
+transition_function2 <- function(plrs,trgt,key_terrain){
   
   df_t <- data.table()
   
@@ -358,7 +245,7 @@ transition_function2 <- function(plrs,trgt){
   conf_all <- conf_check2(plrs,trgt)
   
   df_t <- rbind(df_t, data.table(event = 'conf_check2',t = Sys.time()-t1))
-  print(conf_all)
+  #print(conf_all)
   plrs1 <- plrs[,str_old := str]
 
   trgt1 <- trgt[,str_old := str]
@@ -447,9 +334,31 @@ transition_function2 <- function(plrs,trgt){
   } 
 
   df_t <- rbind(df_t, data.table(event = 'movesame_chk',t = Sys.time()-t1))
-  
-  
-  list(plrs1,trgt1,conf_occ,conf_all,df_t)
+  # print(plrs1)
+  # print(c(plrs1$sp,trgt1$sp))
+  # print(key_terrain$s)
+  # print(any(c(plrs1$sp,trgt1$sp) %in% key_terrain$s))
+  if(any(c(plrs1$sp,trgt1$sp) %in% key_terrain$s) == TRUE){
+    
+    # print('yo')
+    dt1 <- data.table(s = c(plrs1$sp,trgt1$sp),type = c(rep('f',length(plrs1$id)),
+                                                        rep('e',length(trgt1$id))))
+    # print(dt1)
+    # print(key_terrain)
+    territory <- merge(key_terrain,dt1, by = "s", all.x = TRUE, suffixes = c("", "_y"))
+    
+    changeval <- sum(territory[type_y == 'f' & type == 'e']$value) - sum(territory[type_y == 'e'  & type == 'f']$value)
+    # print(territory)
+    # print(changeval)
+    territory[, type := ifelse(is.na(type_y), type, type_y)]
+    territory[, type_y := NULL]
+  } else {
+    territory <- key_terrain
+    changeval <- 0
+  }
+
+  # print(territory)
+  return(list(plrs1,trgt1,conf_occ,conf_all,df_t,territory,changeval))
   
 }
 
@@ -463,8 +372,8 @@ utility_func <- function(q_lst, state_vec){
   return(max(unlist(q_lst$q[s_ind]))[1])
 }
 
-
-prob_setup <- function(samep = .375, adjp = .225, adjbp = .05, backp = .025, stayp = 0.05){
+prob_setup <- function(samep = .9, adjp = .025, adjbp = .01, backp = .01, stayp = 0.02){
+#prob_setup <- function(samep = .575, adjp = .125, adjbp = .05, backp = .025, stayp = 0.05){
   
   total <- samep + 2*adjp + 2*adjbp + backp + stayp
   #print(total)

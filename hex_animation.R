@@ -3,7 +3,7 @@ library(ggimage)
 library(data.table)
 
 source('hex_setup.R')
-table_out <- data.table(read_csv("mcts_test_two_player_25apr1.csv"))
+table_out <- data.table(read_csv("mcts_test_two_player_28apr6.csv"))
 
 #70-28
 #42/3
@@ -14,7 +14,7 @@ table_out <- data.table(read_csv("mcts_test_two_player_25apr1.csv"))
 # units_log$turn <- units_log$turn + 10
 # 
 # units_log <- bind_rows(new_log,units_log)
-#table_out <- units_log
+table_out <- units_log
 table_init <- copy(table_out)
 
 table_init[turn == 1, c('sp','turn','a') := .(s,0,'adj0')]
@@ -36,8 +36,9 @@ pieces <- adj_dt[pieces, on = .(a)]
 ### testing spoke
 pnew <- pieces[turn == 3]
 pnew
-ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
+p <- ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
+  #geom_point(data = hexdt_kt, aes(y = y_pos+0.5, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 15) +
   geom_tile(data = pnew,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
   geom_spoke(data =pnew, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
@@ -51,12 +52,14 @@ ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   #                   values = c('darkred','lightgreen','transparent','orange')) +
   theme_void()
 
-
-
+print(p)
+hexdt_kt <- hexdt[pos %in% key_tern$s]
+hexdt_kt <- distinct(hexdt_kt[,.(x_pos,y_pos)])
 max(pieces$x_pos)
 ### normal animation
 p1 <- ggplot(pieces, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
+  geom_point(data = hexdt_kt, aes(y = y_pos+0.3, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 12) +
   geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
   geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
@@ -82,7 +85,7 @@ animate(p1)
 
 
 animate(p1, height = 6, width = 9,fps = 20,duration = 30, units = "in", res = 160)
-anim_save('images/test_fight_mcts_twoplayer_05aprtest3.gif')
+anim_save('images/test_fight_mcts_territory_02may.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

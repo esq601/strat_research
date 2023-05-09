@@ -50,38 +50,39 @@ reward_conf <- function(conf_out, mode = 'mult'){
   
   #target_new[, rewval := N * (str_old - str)]
   #print(target_new)
-  slf <- ifelse(nrow(conf_out[[1]]) >0,
-                sum((conf_out[[1]]$str_old - conf_out[[1]]$str)),
-                0)
+
   
-  eny <- ifelse(nrow(conf_out[[2]]) >0,
-                sum((conf_out[[2]]$str_old - conf_out[[2]]$str)),
-                0)
-  
-  cbts <- length(unique(conf_out[[4]]$player))
-  # print(conf_out)
-  # print(slf)
-  # print(eny)
-  # print(cbts)
-  #print(length(unique(conf_out[[1]]$id)))
-  # print(target_new)
   if(mode == 'ind'){
-    rew <- eny/sum(conf_out[[2]]$str_old) + 
-      nrow(conf_out[[2]][str<10])
+    # print('ughhh')
+    rew <- 1
+    rew_ind <- 1
   } else{
-    rew <- ((1 +(sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))) /
-      (1 +(sum(conf_out[[1]]$str_old) - sum(conf_out[[1]]$str)))-1) + 
-      nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+ 
-  #   
-  # rew <- eny/sum(conf_out[[2]]$str_old) - slf/sum(conf_out[[1]]$str_old) + 
-  #   nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+ 
+    slf <- ifelse(nrow(conf_out[[1]]) >0,
+                  sum((conf_out[[1]]$str_old - conf_out[[1]]$str)),
+                  0)
+    
+    eny <- ifelse(nrow(conf_out[[2]]) >0,
+                  sum((conf_out[[2]]$str_old - conf_out[[2]]$str)),
+                  0)
+    
+    cbts <- length(unique(conf_out[[4]]$player))
+    
+    # rew <- ((1 +(sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))) /
+    #   (1 +(sum(conf_out[[1]]$str_old) - sum(conf_out[[1]]$str)))-1) +
+    #   nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+
+    rew <- (sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old)  +
+      nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
+    
+    rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,
+                          val = ifelse(conf_out[[1]][order(id)]$id %in% conf_out[[4]]$player,1,0))
+    
+
   }
     #cbts/length(unique(conf_out[[1]]$id))
   #print(rew)
-  rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,
-                        val = ifelse(conf_out[[1]][order(id)]$id %in% conf_out[[4]]$player,1,0))
+
   # print(rew_ind)
   return(list(rew,rew_ind))
 
-  }
+}
 

@@ -8,12 +8,13 @@ source('mcts_one_funcs.R')
 numu <- 2
 nume <- 2
 
-for(game_num in 1:20){
+for(game_num in 1:10){
   print(paste("Game Number:",game_num))
+  
   
   f_players <- data.table(
     id = paste0("inf_",1:numu),
-    s = c('040709','040608'),
+    s = c('040608','050506'),
     #s = posf$pos,
     str = c(100,100),
     
@@ -24,13 +25,18 @@ for(game_num in 1:20){
   e_target <- data.table(
     #id = c('inf_a','inf_b'),
     id = paste0("eny_",1:nume),
-    s = c('091209','091108'),
+    s = c('091108','091007'),
     #s = pose$pos,
     str = c(100,100),
     
     #sp = c('071009','081008'),
     type = 'e'
   )
+  
+  
+  key_tern <- data.table(s = c('060707'), value = 1, type = 'f')
+  
+  
   # f_players <- data.table(
   #   id = paste0("inf_",1:numu),
   #   s = c('060707','050708','080604'),
@@ -120,7 +126,7 @@ for(game_num in 1:20){
   
   
   
-  stopImplicitCluster()
+  #stopImplicitCluster()
   #q_work <- out[[1]]
   while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 15){
     
@@ -154,7 +160,7 @@ for(game_num in 1:20){
     
     #### Friendly setup
     
-    registerDoParallel(cl)
+    #registerDoParallel(cl)
     # 
     i <- 1
     time_single <- Sys.time()
@@ -168,15 +174,15 @@ for(game_num in 1:20){
                             
                             out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                                      legal_a = legal_acts,terr_loc=territory,actions = actions,
-                                                     c = 2,
-                                                     n_iter = 500, depth = 6)
+                                                     c = 1,
+                                                     n_iter = 1000, depth = 8, k_terr = key_tern)
                             out <- out[-1,]
                             out
                           }
     #hold <- out_single
     print(paste("Friendly Single Time:",Sys.time()-time_single))
     
-    stopImplicitCluster()
+    #stopImplicitCluster()
     
     out_single[,q:=ifelse(q < 0, 0, q)]
     
@@ -189,8 +195,10 @@ for(game_num in 1:20){
     ### Eny setup
     
     units_eny <- copy(units)
+    kt_eny <- copy(key_tern)
     
     units_eny[,type := ifelse(type == 'e','f','e')]
+    kt_eny[,type := ifelse(type == 'e','f','e')]
     units_eny <- units_eny[order(-type,id)]
     
     f_players <- units_eny[type == 'f']
@@ -201,7 +209,7 @@ for(game_num in 1:20){
     
     time_single <- Sys.time()
     
-    registerDoParallel(cl)
+    #registerDoParallel(cl)
     
     out_single_e <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr','foreach','doParallel'),
                             .inorder = FALSE, .verbose = FALSE, .errorhandling = 'remove',
@@ -213,13 +221,13 @@ for(game_num in 1:20){
                               
                               out <- simulate_one_mcts(rbind(f_players[i],e_target),single_a,
                                                        legal_a = legal_acts,terr_loc=territory,actions = actions,
-                                                       c = 2,
-                                                       n_iter = 500, depth = 6)  
+                                                       c = 1,
+                                                       n_iter = 1000, depth = 8, k_terr = kt_eny)  
                               out <- out[-1,]
                               out
                             }
     
-    stopImplicitCluster()
+    #stopImplicitCluster()
     #hold <- out_single
     print(paste("Enemy Single Time:",Sys.time()-time_single))
     
@@ -233,7 +241,7 @@ for(game_num in 1:20){
     time_single <- Sys.time()
     #type_chr <- 'f'
     
-    registerDoParallel(cl)
+    #registerDoParallel(cl)
     outvar <- foreach(type_chr = c('f','e'),.combine = rbind,.packages = c('data.table','dplyr','DirichletReg'),
                       .inorder = FALSE, .verbose = FALSE,
                       .export = c('actions_samp','trunc_func','grad_reward')) %dopar% {
@@ -242,8 +250,9 @@ for(game_num in 1:20){
                           
                           
                           out_f <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
-                                                 q=q_work,c =2,
-                                                 n_iter = 15*7^nrow(units[type == 'f']), depth =6, single_out = out_single, actions=actions)
+                                                 q=q_work,c =1,
+                                                 n_iter = 30*7^nrow(units[type == 'f']),
+                                                 depth =8, single_out = out_single, actions=actions, k_terr = key_tern)
                           out_return <- out_f[[2]]
                           
                           out_return$result <- 'f'
@@ -258,8 +267,9 @@ for(game_num in 1:20){
                           
                           #units[,a := NULL]
                           out_e <- simulate_mcts(units_eny,selected_a_eny,legal_a = legal_acts,terr_loc=territory, 
-                                                 q=q_eny,c =2,
-                                                 n_iter = 15*7^nrow(units_eny[type == 'f']), depth =6, single_out = out_single_e, actions=actions)
+                                                 q=q_eny,c =1,
+                                                 n_iter = 30*7^nrow(units_eny[type == 'f']), 
+                                                 depth =8, single_out = out_single_e, actions=actions, k_terr = kt_eny)
                           
                           out_return <- out_e[[2]]
                           
@@ -269,7 +279,7 @@ for(game_num in 1:20){
                         out_return
                       }                  
     
-    stopImplicitCluster()
+    #stopImplicitCluster()
     
     print(paste("Based Time:",Sys.time()-time_single))
     
@@ -296,9 +306,10 @@ for(game_num in 1:20){
     move <- legal_acts[units, on = .(s,a)]
     print(move)
     #move[,param := NULL]
-    trans <- transition_function2(move[type == 'f'],move[type == 'e'])
+    trans <- transition_function2(move[type == 'f'],move[type == 'e'],key_tern)
     print(trans)
-    #print(out[[2]])
+    
+    key_tern <- trans[[6]]#print(out[[2]])
     
     selected_a <- c(trans[[1]][str>10 & order(id)]$a,trans[[2]][str>10 & order(id)]$a)
     units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
@@ -308,7 +319,7 @@ for(game_num in 1:20){
     
     turn <- turn + 1
     units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-    write_csv(units_log, paste0('mcts_test_two_player_25apr',game_num,'.csv'))
+    write_csv(units_log, paste0('mcts_test_two_player_28apr',game_num,'.csv'))
     timenew <- Sys.time()
     print(timenew-timeout)
     
