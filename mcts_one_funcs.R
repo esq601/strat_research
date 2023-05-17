@@ -3,9 +3,9 @@ library(doParallel)
 library(patchwork)
 
 cores=detectCores()
-cl <- makeCluster(cores[1]/2) #not to overload your computer
-registerDoParallel(cl)
-cores
+# cl <- makeCluster(cores[1]/2) #not to overload your computer
+# registerDoParallel(cl)
+# cores
 
 execute_one_action <- function(state,actions,grad,q_lst,c,
                            lasta,act_dt, probdf, depth,prob_b,

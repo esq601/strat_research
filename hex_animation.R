@@ -34,7 +34,7 @@ adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
 pieces <- adj_dt[pieces, on = .(a)]
 
 ### testing spoke
-pnew <- pieces[turn == 3]
+pnew <- pieces[turn == 1]
 pnew
 p <- ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
@@ -55,14 +55,16 @@ p <- ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
 print(p)
 hexdt_kt <- hexdt[pos %in% key_tern$s]
 hexdt_kt <- distinct(hexdt_kt[,.(x_pos,y_pos)])
+hexdt_kt <- cbind(hexdt_kt, turn = unique(pieces$turn))
+
 max(pieces$x_pos)
 ### normal animation
 p1 <- ggplot(pieces, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
   geom_point(data = hexdt_kt, aes(y = y_pos+0.3, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 12) +
   geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
-  geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
-             arrow = arrow(length = unit(0.25, "cm")),size = 1) +
+  # geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
+  #            arrow = arrow(length = unit(0.25, "cm")),size = 1) +
   #geom_text(data = pieces, aes(label = id,color = type),vjust = .25) +
   geom_image(data=pieces, aes(image = image)) +
   scale_fill_distiller(type = "div",direction = 1,limits = c(0,100), palette = "RdYlGn")  +
@@ -84,8 +86,8 @@ animate(p1)
 
 
 
-animate(p1, height = 6, width = 9,fps = 20,duration = 30, units = "in", res = 160)
-anim_save('images/test_fight_mcts_territory_02may.gif')
+animate(p1, height = 6, width = 9,fps = 10,duration = 30, units = "in", res = 160)
+anim_save('images/test_fight_mcts_territory_simple2.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

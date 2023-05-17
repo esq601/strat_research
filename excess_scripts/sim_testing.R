@@ -1,24 +1,46 @@
 
-out <- simulate_mcts(unit_bg1,selected_a[c(1:3,7:12)],legal_a = legal_acts,terr_loc=territory, 
-                     q=q_work1,c =0.2,
-                     n_iter = 1000, depth =8, single_out = out_single, actions=actions,
-                     k_terr = key_tern1)
+out <- simulate_mcts(units,selected_a,legal_a = legal_acts,terr_loc=territory, 
+                     q=q_work1,c =0.4,
+                     n_iter = 200, depth =12,  actions=actions,
+                     k_terr = key_tern)
+
 (out[[2]][order(-q)])
-df <- out[[4]]
+
+out_lst <- out[[3]]
+
+out_lst[['070807']]
+
+act_vec <- vector()
+
+for(i in 1:nrow(units[type == 'f']) ) {
+  #print(units[type == 'f'][[i,2]])
+  unitsel <- units[i]
+  print(unitsel)
+  print(out_lst[[unitsel$s]][[unitsel$id]])
+  print(which.max(out_lst[[unitsel$s]][[unitsel$id]]$q))
+  
+  act <- out_lst[[unitsel$s]][[unitsel$id]][which.max(out_lst[[unitsel$s]][[unitsel$id]]$q)]$a
+  act_vec <- c(act_vec,act)
+}
+
+act_vec
+df <- out[[3]]
 
 
 ggplot(df) +
   geom_boxplot(aes(x = event, y = t))
 
 
-lubridate::as.duration(out_f[[5]])
+#lubridate::as.duration(out_f[[5]])
 
 
 df1 <-df %>%
   group_by(event) %>%
   mutate(t = lubridate::as.duration(t)) %>%
-  summarise(num = n(), total = sum(t), mean = mean(t), sd = sd(t),pct = lubridate::as.duration(total)/lubridate::as.duration(out[[5]]))
-sum(df1$pct)
+  summarise(num = n(), total = sum(t), mean = mean(t), sd = sd(t))
+
+df1#sum(df1$pct)
+
 
 lubridate::as.duration(sum(df1$total))
 

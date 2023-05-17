@@ -81,9 +81,9 @@ grad_reward <- function(trans,grad,c = 1){
 
 
 
-reward_new <- function(trans,grad_reward,mode = 'mult'){
+reward_new <- function(trans,grad_reward,mode = 'mult',ft_wt = 0.75, tr_wt = 0.25){
   
-  r <- grad_reward
+  r <- tr_wt*grad_reward
   
   #print(trans)
   
@@ -95,23 +95,16 @@ reward_new <- function(trans,grad_reward,mode = 'mult'){
   #r <- nrow(trans[[1]])*-0.05  #For MCTS
   #target[,sp := s] # this command it to add sp column when calculating reward
   #assumes the 'target' doesn't move.  may not work with actual calcs
-  rdt <- data.table(id = trans[[1]]$id, val = 0)
+  rdt <- data.table(id = trans[[1]]$id,s=trans[[1]]$s,a=trans[[1]]$a, val = r)
   if(trans[[3]] == TRUE ){
 
-    rconf <- reward_conf(trans, mode)
-    # print(trans)
-    # print(rconf)
-    if(mode == 'mult') {
-      r <- .2*r + .8*rconf[[1]]
-      
-      rdt <- rconf[[2]]
-    } else {
-      r <- .5* r + .5* rconf[[1]]
-      rdt <- rconf[[2]]
-    }
+    rconf <- reward_conf(trans,ft_wt,tr_wt)
 
+    
+    rdt <- rconf[[2]]
+    #print(rdt)
   }
-  
+  #print(rdt)
   return(list(r,rdt))
 }
 
@@ -166,7 +159,8 @@ gradient_function <- function(players,target){
 
 
 conf_check2 <- function(players,target){
-  
+  df_t <- data.table()
+  # t1 <- Sys.time()
   out <- data.table()
   
   if(nrow(players) > 0 & nrow(target) > 0){
@@ -180,49 +174,62 @@ conf_check2 <- function(players,target){
                     function(x) c(as.integer(substr(x, 1, 2)), 
                                   as.integer(substr(x, 3, 4)),
                                   as.integer(substr(x, 5, 6))))
-    
-    # f_vec <- as.vector(sapply(players$sp,
-    #                           function(x) sum(as.integer(substr(x, 1, 2)), 
-    #                                           as.integer(substr(x, 3, 4)),
-    #                                           as.integer(substr(x, 5, 6))))
-    # )
-    # 
-    # f_lvl <- as.vector(sapply(players$sp,
-    #                           function(x) as.integer(substr(x, 5, 6)))
-    # )
-    # 
-    # e_vec <- as.vector(sapply(target$sp,
-    #                           function(x) sum(as.integer(substr(x, 1, 2)), 
-    #                                           as.integer(substr(x, 3, 4)), 
-    #                                           as.integer(substr(x, 5, 6))))
-    # )
-    # 
-    # e_lvl <- as.vector(sapply(target$sp,
-    #                           function(x) as.integer(substr(x, 5, 6)))
-    # )
+
+    # df_t <- rbind(df_t, data.table(event = 'conf1_vects',t = Sys.time()-t1))
+    t1 <- Sys.time()
     # print(f_vec)
-    # print(f_lvl)
     # print(e_vec)
-    # print(e_lvl)
-    # matches <- lapply(f_vec,find_indices,vec  = e_vec)
     matches <- compare_lists(f_vec, e_vec)
-    #print(matches)
-    for(i in 1:length(matches)){
-      
-      if(length(matches[[i]])>0){
-        
-        for(j in 1:length(matches[[i]])){
-          
-          out_t <- data.table(player = players[i]$id,target = target[matches[[i]][[j]]]$id)
-          
-          out <- rbind(out,out_t)
-          
-        }
-      }
-      
-    }
+    matches1 <- compare_lists(e_vec, f_vec)
+    # print('Lists')
+    # print(matches)
+    # print('list2')
+    # print(matches1)
+    # print('vectors')
+    # print(unlist(matches))
+    # 
+    # print((unlist(matches1)))
+
+    # df_t <- rbind(df_t, data.table(event = 'conf2_comp',t = Sys.time()-t1))
+    # #print(matches)
+    # t1 <- Sys.time()
+    
+    plt <- players[unlist(matches1),.(player = id,f_str = str)]
+    plt$fmod <- 0.25
+    # print(plt)
+    plt[,f_str := fmod*(f_str / .N), by = player]
+    tgt <- target[unlist(matches),.(target = id,e_str = str)]
+    tgt$emod <- 0.25
+    tgt[,e_str := emod*(e_str / .N), by = target]
+    #print(plt)
+    out <- cbind(plt,tgt)
+    # print(out)
+    
+    eout <- out[, .(mod = floor(sum(f_str))), by = target]
+    fout <- out[, .(mod = floor(sum(e_str))), by = player]
+    # print(fout)
+    # print(eout)
+    
+    # df_t <- rbind(df_t, data.table(event = 'conf3_loop',t = Sys.time()-t1))
+    
+    # for(i in 1:length(matches)){
+    #   
+    #   if(length(matches[[i]])>0){
+    #     
+    #     for(j in 1:length(matches[[i]])){
+    #       
+    #       out_t <- data.table(player = players[i]$id,target = target[matches[[i]][[j]]]$id)
+    #       
+    #       out <- rbind(out,out_t)
+    #       
+    #       df_t <- rbind(df_t, data.table(event = 'conf3_loop',t = Sys.time()-t1))
+    #       
+    #     }
+    #   }
+    #   
+    # }
   }
-  return(out)
+  return(list(out,df_t,fout,eout))
 }
 
 
@@ -238,116 +245,127 @@ find_indices <- function(num, vec) {
 
 transition_function2 <- function(plrs,trgt,key_terrain){
   
+  t0 <-Sys.time()
+  
   df_t <- data.table()
   
-  t1 <- Sys.time()
   
-  conf_all <- conf_check2(plrs,trgt)
-  
-  df_t <- rbind(df_t, data.table(event = 'conf_check2',t = Sys.time()-t1))
   #print(conf_all)
-  plrs1 <- plrs[,str_old := str]
+  plrs$str_old <- plrs$str
 
-  trgt1 <- trgt[,str_old := str]
+  trgt$str_old <- trgt$str
   
-  if(nrow(conf_all) > 0  ) {
-    t1 <- Sys.time()
-    
-    conf_occ <- TRUE 
-    confout <- conflict(conf_all,plrs,trgt)
-    
-    df_t <- rbind(df_t, data.table(event = 'conflict',t = Sys.time()-t1))
-    
-    t1 <- Sys.time()
-    plrvec <- paste0(plrs1$sp,plrs1$s)
-    tgtvec <- paste0(trgt1$sp,trgt1$s)
-    
-    # Modify strength based on conflict
-    plrs1[confout[[1]], on = c(id = 'player'),str := str-mod]
-    
-    # Dont allow negative strength
-    plrs1[str < 0, str := 0]
-    
-    # Check for units that attacked into each other
-    plrs1[paste0(s,sp)%in%tgtvec,sp:=s]
-    
-    # Check for units that attacked into stationary
-    plrs1[sp %in% trgt1[s == sp,]$sp,sp := s]
+  
 
-    
-    # Work on targets
-
-    trgt1[confout[[2]], on = c(id = 'target'),str := str-mod]
-    
-    trgt1[str < 0, str := 0]
-    trgt1[paste0(s,sp)%in%plrvec,sp:=s]
-    
-    
-    trgt1[sp %in% plrs1[s == sp,]$sp,sp := s]
-    
-    
-    # Check for units that ended on the same space
-
-    df_t <- rbind(df_t, data.table(event = 'restofconf',t = Sys.time()-t1))
-    
-    
-
-  }else{
-    conf_occ <- FALSE
-  }
+  
+  # df_t <- rbind(df_t, data.table(event = 'ex0_idfk',t = Sys.time()-t0))
+  ob1 <-  Sys.time()-t0
   t1 <- Sys.time()
   # Check for units moving into the same space
-  if(any(duplicated(c(plrs1$sp,trgt1$sp))) == TRUE){
-    comb <- rbind(plrs1,trgt1)
+  if(any(duplicated(c(plrs$sp,trgt$sp))) == TRUE){
+    # print(plrs)
+    # print(trgt)
+
+    
+    comb <- rbind(plrs,trgt)
     
     # Sample who gets the space according to strength ratios
     comb <- comb[, .SD[sample(.N, 1, prob = str_old)], by = sp]
     
     # If the unit is not selected by sample, it's returned to original space
-    plrs1[,sp := ifelse(id %in% comb$id,sp,s)]
-    trgt1[,sp := ifelse(id %in% comb$id,sp,s)]
+    plrs[,sp := ifelse(id %in% comb$id,sp,s)]
+    trgt[,sp := ifelse(id %in% comb$id,sp,s)]
     
     
-    # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
-    # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
-    allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
-    # print(max(c(psame$un,tsame$un)))
-    # print(psame)
-    # print(tsame)
-    while(max(c(allsame$uno))>1){
-      
-      psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
-      tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
-      
-      plrs1[sp %in% c(trgt1$sp,psame[un>1]$sp), sp := s]
-      trgt1[sp %in% c(plrs1$sp,tsame[un>1]$sp), sp := s]
-      
-      
-      # psame <- plrs1[,.(un = uniqueN(.SD)),by = 'sp']
-      # tsame <- trgt1[,.(un = uniqueN(.SD)),by = 'sp']
-      
-      allsame <- rbind(plrs1,trgt1)[,.(uno = uniqueN(.SD)),by = 'sp']
-      # print(psame)
-      # print(tsame)
-      # print(allsame)
-    }
-  } 
+    # psame <- plrs[,.(un = uniqueN(.SD)),by = 'sp']
+    # tsame <- trgt[,.(un = uniqueN(.SD)),by = 'sp']
+    #allsame <- rbind(plrs,trgt)[,.(uno = uniqueN(.SD)),by = 'sp']
 
-  df_t <- rbind(df_t, data.table(event = 'movesame_chk',t = Sys.time()-t1))
-  # print(plrs1)
-  # print(c(plrs1$sp,trgt1$sp))
-  # print(key_terrain$s)
-  # print(any(c(plrs1$sp,trgt1$sp) %in% key_terrain$s))
-  if(any(c(plrs1$sp,trgt1$sp) %in% key_terrain$s) == TRUE){
+
+# 
+#     ck_out <- check_and_correct_moves_vec(c(plrs$s,trgt$s),c(plrs$sp,trgt$sp))
+#     
+#     plrs$sp <- ck_out[1:nrow(plrs)]
+#     trgt$sp <- ck_out[(nrow(plrs)+1):length(ck_out)]
+    # while(max(c(allsame$uno))>1){
+    # 
+    # 
+    #   # print(allsame)
+    #   # print(plrs)
+    #   # print(trgt)
+    #   t1a <- Sys.time()
+    #   psame <- plrs[,.(un = uniqueN(.SD)),by = 'sp']
+    #   tsame <- trgt[,.(un = uniqueN(.SD)),by = 'sp']
+    # 
+    #   plrs[sp %in% c(trgt$sp,psame[un>1]$sp), sp := s]
+    #   trgt[sp %in% c(plrs$sp,tsame[un>1]$sp), sp := s]
+    # 
+    # 
+    #   # psame <- plrs[,.(un = uniqueN(.SD)),by = 'sp']
+    #   # tsame <- trgt[,.(un = uniqueN(.SD)),by = 'sp']
+    # 
+    #   allsame <- rbind(plrs,trgt)[,.(uno = uniqueN(.SD)),by = 'sp']
+    # 
+    #   df_t <- rbind(df_t, data.table(event = 'ex1a_same_loop',t = Sys.time()-t1a))
+    # }
+  } 
+  ob2 <-  Sys.time()-t1
+  t1 <- Sys.time()
+  # df_t <- rbind(df_t, data.table(event = 'ex1_same_ck',t = Sys.time()-t1))
+  # 
+  # t1 <- Sys.time()
+  
+
+  # plrvec <- paste0(plrs$sp,plrs$s)
+  # 
+  # tgtvec <- paste0(trgt$sp,trgt$s)
+  
+  
+  # Dont allow negative strength
+  
+  
+  # Check for units that attacked into each other
+  # plrs[paste0(s,sp)%in%tgtvec,sp:=s]
+  # plrs[paste0(s,sp)%in%plrvec,sp:=s]
+  # # Check for units that attacked into stationary
+  # plrs[sp %in% trgt[s == sp,]$sp,sp := s]
+  # plrs[sp %in% plrs[s == sp,]$sp,sp := s]
+  # 
+  # trgt[paste0(s,sp)%in%plrvec,sp:=s]
+  # trgt[paste0(s,sp)%in%tgtvec,sp:=s]
+  # 
+  # trgt[sp %in% plrs[s == sp,]$sp,sp := s]
+  # trgt[sp %in% trgt[s == sp,]$sp,sp := s]
+  ck_out <- check_and_correct_moves_vec(c(plrs$s,trgt$s),c(plrs$sp,trgt$sp))
+  
+  
+  
+  #ck_out <- check_and_correct_moves(rbind(plrs,trgt))
+  
+  # print(ck_out)
+  # print(plrs)
+  # print(trgt)
+  # print(length(ck_out))
+  # print(1:nrow(plrs))
+  # print((nrow(plrs)+1):length(ck_out))
+  
+  plrs$sp <- ck_out[1:nrow(plrs)]
+  trgt$sp <- ck_out[(nrow(plrs)+1):length(ck_out)]
+  # 
+  # df_t <- rbind(df_t, data.table(event = 'ex2_preconf_ck',t = Sys.time()-t1))
+  # 
+  # t1 <- Sys.time()
+  ob3 <-  Sys.time()-t1
+  t1 <- Sys.time()
+  
+  if(any(c(plrs$sp,trgt$sp) %in% key_terrain$s) == TRUE){
     
-    # print('yo')
-    dt1 <- data.table(s = c(plrs1$sp,trgt1$sp),type = c(rep('f',length(plrs1$id)),
-                                                        rep('e',length(trgt1$id))))
-    # print(dt1)
-    # print(key_terrain)
+    dt1 <- data.table(s = c(plrs$sp,trgt$sp),type = c(rep('f',length(plrs$id)),
+                                                        rep('e',length(trgt$id))))
+    
     territory <- merge(key_terrain,dt1, by = "s", all.x = TRUE, suffixes = c("", "_y"))
     
-    changeval <- sum(territory[type_y == 'f' & type == 'e']$value) - sum(territory[type_y == 'e'  & type == 'f']$value)
+    changeval <- (sum(territory[type_y == 'f' & type == 'e']$value) - sum(territory[type_y == 'e'  & type == 'f']$value))/sum(key_terrain$value)
     # print(territory)
     # print(changeval)
     territory[, type := ifelse(is.na(type_y), type, type_y)]
@@ -356,11 +374,130 @@ transition_function2 <- function(plrs,trgt,key_terrain){
     territory <- key_terrain
     changeval <- 0
   }
+  
+  ob4 <-  Sys.time()-t1
+  t1 <- Sys.time()
+  
+  conf_all <- conf_check2(plrs,trgt)
+  
+  #conf_all <- conf_all[[1]]
+  
+  ob5 <-  Sys.time()-t1
+  t1 <- Sys.time()
+  
+  if(nrow(conf_all[[1]]) > 0 ) {
 
+    
+    conf_occ <- TRUE    # print(plrs)
+    # print(trgt)
+    # print(conf_all)
+    
+    #confout <- conflict(conf_all,plrs,trgt)
+    
+    # Modify strength based on conflict
+    # print(conf_all[[3]])
+    plrs[conf_all[[3]], on = c(id = 'player'),str := str-mod]
+    
+    # Work on targets
+    
+    trgt[conf_all[[4]], on = c(id = 'target'),str := str-mod]
+    
+    trgt[str < 0, str := 0]
+    
+    plrs[str < 0, str := 0]
+    
+  }else{
+    conf_occ <- FALSE
+  }
+  ob6 <-  Sys.time()-t1
+
+  print(c(ob1,ob2,ob3,ob4,ob5,ob6))
+  print(sum(ob1,ob2,ob3,ob4,ob5,ob6))
+  print(paste("total",(Sys.time()-t0)))
+  print(paste('dif',(Sys.time()-t0) - sum(ob1,ob2,ob3,ob4,ob5,ob6)) )
+  
+  #print(paste("Total:", Sys.time()-t0))
+  # df_t <- rbind(df_t, data.table(event = 'ex4_conflict',t = Sys.time()-t1))
+  # df_t <- rbind(df_t, data.table(event = 'ex_all_wholetrans',t = Sys.time()-t0))
   # print(territory)
-  return(list(plrs1,trgt1,conf_occ,conf_all,df_t,territory,changeval))
+  return(list(plrs,trgt,conf_occ,conf_all,df_t,territory,changeval))
   
 }
+6.44+3.88+.445+.254+4.6+6.62
+
+
+check_and_correct_moves_vec <- function(s, sp) {
+  # Create a copy of sp to modify
+  sp_new <- sp
+
+  # Initialize a variable to track changes
+  changes_made <- TRUE
+
+  # Loop until no changes are made
+  while(changes_made & any(duplicated(sp_new))) {
+    changes_made <- FALSE
+     # print(s)
+     # print('sp below')
+     # print(sp)
+    # Get the indices and values where s == sp
+    stationary_inds <- which(s == sp_new)
+    stationary_values <- sp_new[stationary_inds]
+
+    # Check if any sp equals those values
+    moving_inds <- which(sp_new %in% stationary_values)
+
+    # If so, set the new sp for that object back to s
+    if(length(moving_inds) > 0) {
+      sp_new[moving_inds] <- s[moving_inds]
+      changes_made <- TRUE
+    }
+  }
+  #print('yooo')
+  ssp <- paste0(s,sp_new)
+  sps <- paste0(sp_new,s)
+  #print(sp_new)
+  # Now check for the case where two objects attempt to switch places
+  switch_inds <- which(ssp %in% sps & sps %in% ssp)
+  sp_new[switch_inds] <- s[switch_inds]
+
+  return(sp_new)
+}
+
+
+
+
+
+
+check_and_correct_moves <- function(dt) {
+  # Convert to data.table if not already
+  if (!is.data.table(dt)) {
+    dt <- as.data.table(dt)
+  }
+  
+  # Set key for efficient joining
+  setkey(dt, id, s, sp)
+  
+  # 1. Two objects attempt to switch places
+  switch_rows <- dt[dt, on = .(s = sp, sp = s)]
+  if (nrow(switch_rows) > 0) {
+    dt[id %in% switch_rows$id, sp := s]
+  }
+  
+  # 2. One object attempts to move into a stationary piece
+  stationary_rows <- dt[dt, on = .(sp = s), nomatch = 0L]
+  if (nrow(stationary_rows) > 0) {
+    dt[id %in% stationary_rows$id, sp := s]
+  }
+  
+  # 3. Two objects attempt to move into the same location
+  same_sp_rows <- dt[, .N, by = sp][N > 1]
+  if (nrow(same_sp_rows) > 0) {
+    dt[sp %in% same_sp_rows$sp, sp := s]
+  }
+  
+  return(dt)
+}
+
 
 
 
@@ -396,6 +533,7 @@ ptest <- prob_setup()
 
 
 compare_lists <- function(list1, list2) {
+  
   lapply(list1, function(x) {
     # create a boolean vector to store the comparison results for each element in list2
     which(sapply(list2, function(y) {

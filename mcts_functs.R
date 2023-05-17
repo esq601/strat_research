@@ -1,16 +1,16 @@
 library(data.table)
+library(clue)
 source('hex_setup.R')
 source('hex_conflict.R')
 source('hex_funcs.R')
 
 
 
-execute_action <- function(state,actions,grad,q_lst,c,
+execute_action <- function(state,actions,grad,c,
                            lasta,act_dt, probdf, depth,prob_b,
-                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist) {
+                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist, ind_q,leg_acts) {
+
   
-  # Only current states are subsetted
-  #print(k_t)
   state <- state[order(-type)]
   # print(state)
   t1 <- Sys.time()
@@ -29,31 +29,36 @@ execute_action <- function(state,actions,grad,q_lst,c,
   #### New select function ####
   
   t1 <- Sys.time()
-  # print(sing_lst)
-  actvec_f <- apply(lasta,FUN = selfun,MARGIN = 1,
-                           prob = sing_lst, legal_a = leg_lst, rand = FALSE)
   
-  s_act <- data.table(s = lasta$s, a = actvec_f)
-  #print(s_act)
-  sp_sel <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
+  rand_select <- FALSE
+  sel_num <- 0
+  
+  selecta <- rbindlist(apply(X = lasta[,.(id,s)], FUN = selfun3,
+                             MARGIN = 1,lst = ind_q))
 
-  j_switch <- 0
-  rand_switch <- FALSE
+  # If (s,a) hasn't been explored, add large value to ensure selection
+  selecta[,sum_qn := ifelse(n == 0, 1000, q + c*sqrt(log(sum(n))/n)), by = 's']
+
+  # Make wide
+  wide_dt <- dcast(selecta, id ~ sp, value.var = "sum_qn")
   
-  while(class(sp_sel) == 'list' | length(sp_sel) == 0 |any(duplicated(sp_sel)) == TRUE){
-    
-    actvec_f <- apply(lasta,FUN = selfun,MARGIN = 1,
-                    prob = sing_lst, legal_a = leg_lst, rand = rand_switch)
-    
-    s_act <- data.table(s = lasta$s, a = actvec_f)
-    sp_sel <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
-    
-    j_switch <- j_switch+1
-    
-    if(j_switch>10){
-      rand_switch <- TRUE
-    }
-  }
+  # Replace NA values with large value to ensure non-selection
+  wide_dt[is.na(wide_dt)] <- -100
+  
+  # Remove the 'id' column and convert the data.table to a matrix
+  cost_matrix <- as.matrix(wide_dt[, -"id"])
+  
+  cost_matrix <- cost_matrix - 1000
+  
+  # Solve the assignment problem
+  assignment <- solve_LSAP(-cost_matrix)
+  
+  # Create a final data.table based on the optimal assignment
+  opt_move <- data.table(id = wide_dt$id, sp = colnames(cost_matrix)[assignment], qn_sum = cost_matrix[cbind(seq_len(nrow(cost_matrix)), assignment)])
+
+  
+  selecta <- selecta[opt_move, on = .(id, sp)]
+  
   
   df_t <- rbind(df_t, data.table(event = 'select_fun',t = Sys.time()-t1))
   
@@ -62,294 +67,147 @@ execute_action <- function(state,actions,grad,q_lst,c,
   t1 <- Sys.time()
   act_sel <- apply(sa_dt,FUN = belfun2,MARGIN = 1,plist = prob_lst,leg_list = leg_lst)
   df_t <- rbind(df_t, data.table(event = 'belief_fun',t = Sys.time()-t1))
-  s_act <- data.table(s = sa_dt$s, a = act_sel)
-  t1 <- Sys.time()
-  dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
-  df_t <- rbind(df_t, data.table(event = 'same_fun',t = Sys.time()-t1))
-  # while(class(dtout) == 'list' |length(dtout) == 0 | any(duplicated(dtout)) == TRUE){
-  #   print(dtout)
-  #   act_sel <- apply(sa_dt,FUN = belfun2,MARGIN = 1,plist = prob_lst,leg_list = leg_lst)
-  #   
-  #   s_act <- data.table(s = sa_dt$s, a = act_sel)
-  #   dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
-  # }
-  #df_t <- rbind(df_t, data.table(event = 'belief_fun',t = Sys.time()-t1))
-  # 
-  # print(depth)
-  # print(dtout)
-  
-  actvec <- c(actvec_f,act_sel)
-  sp_sel <- c(sp_sel, dtout)
-  ##### Move Select #####
 
+  t1 <- Sys.time()
+  s_act <- data.table(s = sa_dt$s, a = act_sel)
+  s_act <- merge(s_act, leg_acts, by = c('s','a'), all.x = TRUE)
+  #dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
+  df_t <- rbind(df_t, data.table(event = 'same_fun',t = Sys.time()-t1))
+  
+  actvec <- c(selecta$a,s_act$a)
+  sp_sel <- c(selecta$sp, s_act$sp)
+  ##### Move Select #####
+  
   t1 <- Sys.time()
   
   move <- state
   move$a <- actvec
   move$sp <- sp_sel
   
+  #df_t <- rbind(df_t, data.table(event = 'move_select_2paste',t = Sys.time()-t1))
   
-  s_vec <- paste0(lasta$id,lasta$s,collapse = '')
-  sa_vec <- paste0(lasta$id,lasta$s,actvec_f,collapse = '')
+  t2 <- Sys.time()
   
-  df_t <- rbind(df_t, data.table(event = 'move_select_2paste',t = Sys.time()-t1))
-  t1 <- Sys.time()
+  trans <- transition_function2(move[type == 'f'],move[type == 'e'],k_t)
   
-  # print(sa_vec)
-  # print(q_lst$sa$sa)
-  matches <- q_lst$sa$sa %in% sa_vec
+  df_t <- rbind(df_t, data.table(event = 'transition_func',t = Sys.time()-t2))
+  df_t <- rbind(df_t,trans[[5]])
   
-  ### Count and index the matches of (s,a)
-  outnew <- which(matches, arr.ind = FALSE)
-  # print(outnew)
-  df_t <- rbind(df_t, data.table(event = 'move_select_3match',t = Sys.time()-t1))
-  
-
-  
-  t1 <- Sys.time()
-  ### If there is no match, initiate counter and set Q=r
-  if(length(outnew) > 0) {
-    
-
-    matches_s <- q_lst$s$s %in% s_vec
-    
-    matches_s <- which(matches_s)
-
-    ucb <- ((c*(disc^depth))*sqrt(log(sum(unlist(q_lst$n[matches_s])))/unlist(q_lst$n[matches_s])))
-    
-    qsa <- unlist(q_lst$q[matches_s])
-# 
-    if(depth ==0){
-
-      cat(c(sum(unlist(q_lst$n[matches_s])),
-      unlist(q_lst$n[matches_s]),'ucb:',round(ucb,digits = 2),'qsa:',round(qsa,digits = 2),'q_ind:',
-      q_lst$ind_q[[outnew]]$val),'\r')
-    }
-
-    ucb <- ucb + qsa
-    
-    movenew <- data.table(id = move[type=='f']$id,s = move[type == 'f']$s,
-                          type = move[type=='f']$type, str = move[type=='f']$str)
-    
-    movenew$a <- q_lst$a[matches_s[[which.max(ucb)]]]
-    
-    if(which.max(ucb) == which.max(qsa)){
-      
-      type_act <- 'exploit'
-      
-      if(max(q_lst$ind_q[[outnew]]$val > 1)){
-        
-        for (i in which(q_lst$ind_q[[outnew]][order(id)]$val <= 1)){
-          
-          j_switch <- 0
-          rand_switch <- FALSE
-          cur_move <- movenew[i,]
-          cur_move$sid <- paste0(cur_move$id,cur_move$s)
-          
-          if(is.na(cur_move$id) == TRUE){
-            #print('broke')
-            break
-          }
-          new_move <- apply(cur_move,FUN = selfun,MARGIN = 1,
-                            prob = sing_lst, legal_a = leg_lst, rand = rand_switch)
-          
-          movenew[i,5] <- new_move
-          
-          s_act <- data.table(s = movenew$s, a = movenew$a)
-          
-          sp_sel <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
-          
-          while(new_move == cur_move$a | class(sp_sel) == 'list' | length(sp_sel) == 0 |any(duplicated(sp_sel)) == TRUE ){
-            new_move <- apply(cur_move,FUN = selfun,MARGIN = 1,
-                              prob = sing_lst, legal_a = leg_lst, rand = rand_switch)
-            
-            movenew[i,]$a <- new_move
-            
-            s_act <- data.table(s = movenew$s, a = movenew$a)
-            
-            sp_sel <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
-            
-            j_switch <- j_switch+1
-            if(j_switch>10){
-              rand_switch <- TRUE
-            }
-            if(j_switch > 100){
-              print('too many switches!')
-              break
-            }
-          }
-        }
-      }
-    } else {
-      
-      type_act <- 'explore'
-    }
-    
-    # print(movenew)
-    movenew <- actions[movenew, on = .(s,a)]
-    # print(movenew)
-    t2 <- Sys.time()
-    trans <- transition_function2(movenew,move[type == 'e'],k_t)
-    
-    # print('trans')
-    # print(trans[[1]][order(id)])
-    df_t <- rbind(df_t, data.table(event = 'transition_func',t = Sys.time()-t2))
-    df_t <- rbind(df_t,trans[[5]])
-    
-    #grad_rew <- 0#grad_reward(trans, grad, c = .25)
-    grad_rew <- (sum(trans[[6]][type == 'f']$value) - sum(trans[[6]][type == 'e']$value))/sum(trans[[6]]$value)
-    #print(trans[[7]])
-    #grad_rew <- trans[[7]]
-    rew <- reward_new(trans,grad_rew)
-    
-    typeout <- 'update'
-    
-    df_t <- rbind(df_t, data.table(event = 'ex_update',t = Sys.time()-t1))
-    
-  }else{
-    
-    type_act <- 'new'
-    
-    t2 <- Sys.time()
-    trans <- transition_function2(move[type == 'f'],move[type == 'e'],k_t)
-
-    df_t <- rbind(df_t, data.table(event = 'transition_func',t = Sys.time()-t2))
-    df_t <- rbind(df_t,trans[[5]])
-    
-    grad_rew <- (sum(trans[[6]][type == 'f']$value) - sum(trans[[6]][type == 'e']$value))/sum(trans[[6]]$value)
-    #grad_rew <- trans[[7]]
-    #print(trans[[7]])
-    rew <- reward_new(trans,grad_rew)
-    
-    df_t <- rbind(df_t, data.table(event = 'ex_new',t = Sys.time()-t1))
-    typeout <- 'new'
-  }
- 
-  # print(trans[[7]])
+  grad_rew <- trans[[7]]
+  #print(trans[[7]])
+  rew <- reward_new(trans,grad_rew)
   # print(rew)
+  df_t <- rbind(df_t, data.table(event = 'ex_new',t = Sys.time()-t1))
+  typeout <- 'new'
+  
   dtout <- df_t
   
-  return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,type_act,dtout,trans[[6]]))
+  return(list(rbind(trans[[1]][order(id)],trans[[2]][order(id)]),rew,grad_rew,0,dtout,trans[[6]]))
   
 }
 
 
 
-q_update <- function(q_lst, transition,last_val, gamma = 0.95,j) {
-  
-  trigger <- F
-  
-  #transition[[1]][order(id)]
-  friendlies <- transition[[1]][type == 'f']
-  
-  s_old_vec <- paste0(friendlies$id,friendlies$s,collapse = '')
-  
-  s_vec <- paste0(friendlies$id,friendlies$sp,collapse = '')
-  
-  sa_vec <- paste0(friendlies$id,friendlies$s,friendlies$a, collapse = '')
-  
-  matches <- q_lst$sa$sa %in% sa_vec
-  ### Count and index the matches of (s,a)
-  outnew <- which(matches, arr.ind = FALSE)
-  
-  u_ind <- last_val[[1]]
-  
-  val <- transition[[2]][[1]]
-  ind_dt <- transition[[2]][[2]]
-  
-  val <- (val + gamma * u_ind)
-  
-  indv_q <- data.table::merge.data.table(ind_dt,last_val[[2]], by = "id", all = TRUE,  suffixes = c('_new','_old'))
-  indv_q[is.na(indv_q)] <- 0
-  indv_q_update <- data.table(id = indv_q$id, val = indv_q$val_new + gamma * indv_q$val_old)
-  
-  # if(any(0 %in% indv_q_update$id) | any("0" %in% indv_q_update$id)) {
-  # print(ind_dt)
-  # print(last_val[[2]])
-  # print(indv_q)
-  # print(indv_q_update)
-  # }
-  ### If there is no match, initiate counter and set Q=r
-  if(length(outnew) == 0) {
-    
-    
-    q_lst$s <- rbind(q_lst$s,data.table(s = s_old_vec))
-    q_lst$a <- append(q_lst$a,list(as.vector(t(transition[[1]][type=='f',list(a)]))))
-    q_lst$sa <- rbind(q_lst$sa,data.table(sa = sa_vec))
-    q_lst$q <- append(q_lst$q,list(val))
-    q_lst$n <- append(q_lst$n,list(1))
-    q_lst$grad_rew <- append(q_lst$grad_rew,transition[[2]][[1]])
-    
-    
-    q_lst$ind_q <- append(q_lst$ind_q, list(indv_q_update))
-    
-  } else{
-    
-    matches <-  q_lst$sa$sa %in% sa_vec
-    outnew <- which(matches, arr.ind = FALSE)
-    
-    
-    q_lst$n[outnew] <- list(q_lst$n[[outnew]]+1)
-    
 
-    inv_q_mean <- data.table::merge.data.table(indv_q_update,q_lst$ind_q[[outnew]],
-                                               by = "id", all = TRUE,
-                                               suffixes = c('_new','_old'))
-    inv_q_mean[is.na(inv_q_mean)] <- 0
-    
-    indv_q_update <- data.table(id = inv_q_mean$id, 
-                                val = inv_q_mean$val_old + (inv_q_mean$val_new - inv_q_mean$val_old)/q_lst$n[[outnew]])
-    
-    q_lst$ind_q[outnew] <- list(indv_q_update)
-    
-    
-    q_lst$q[outnew] <- list(q_lst$q[[outnew]] + (val - q_lst$q[[outnew]])/q_lst$n[[outnew]])
-    
-  }
+q_update <- function(indv_q,ind_q_ls, gamma = 0.95,j) {
+ 
+
+  indv_q_list <- split(indv_q, paste(indv_q$s, indv_q$id, sep = "."))
   
-  return(list(q_lst,list(val,indv_q_update),outnew,trigger))
+  names_ls <- names(ind_q_ls)
+  
+  ind_q_ls <- lapply(names(ind_q_ls), function(s) {
+    sublist <- lapply(names(ind_q_ls[[s]]), function(id) {
+      
+      
+      if (paste(s, id, sep = ".") %in% names(indv_q_list)) {
+        a_use <- indv_q_list[[paste(s, id, sep = ".")]]$a
+        q_use <- indv_q_list[[paste(s, id, sep = ".")]]$q_new
+        
+        for(i in 1:length(a_use)){
+          ind_q_ls[[s]][[id]][a==a_use[i],
+                              n := n + 1]
+          ind_q_ls[[s]][[id]][a==a_use[i],
+                              q := q + ((q_use[i] - q) / n)]
+        }
+
+      }
+      ind_q_ls[[s]][[id]]
+    })
+    names(sublist) <- names(ind_q_ls[[s]])
+    sublist
+  })
+  
+
+  
+  names(ind_q_ls) <- names_ls
+
+  indv_out <- data.table(id = indv_q$id, val = indv_q$val_new)
+
+  
+  return(list(0,list(0,indv_out),0,0,ind_q_ls))
 }
 
-simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
-                          n_iter = 250, depth = 5, single_out,actions,k_terr){
+
+q_setup <- function(unit_obj, legal_a){
+  # replicate the data.table object for each value in the vector
+  replicated_dt <- lapply(unit_obj[type == 'f']$id, function(v) legal_a)
+  
+  # combine the replicated data.table objects into a new data.table object
+  new_dt <- rbindlist(replicated_dt, idcol = "id")
+  
+  # add a column with the values of the vector
+  new_dt[, id := unit_obj[type == 'f']$id[id]]
+  
+  new_dt$n <- 0
+  new_dt$q <- 0
+  
+  new2 <- split(new_dt, by = 's')
+  
+  # Then, split each subset by 'id'
+  
+  ind_q_lst <- lapply(new2, function(x) split(x, x$id))
+  
+  return(ind_q_lst)
+}
+
+simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
+                          n_iter = 250, depth = 5, actions,k_terr, gamma = 0.95){
   
   avg_u <- 0
   bigval <- 0
   i <- 0
   df_type <- data.frame()
   time_stamp <- Sys.time()
-  time_init <- Sys.time()
   actions_dt <- data.table(actions)
   prob_base <- prob_setup()
   df_log <- data.table()
   print(unit_obj)
   
-  ### New stuff for belief update ####
+  ### Set up list with individual q values ####
+  
+  
+  ind_q_lst <- ind_q_in
+
   prob_ls <- split(prob_base, by = 'a')
   leg_ls <- split(data.table(legal_a), by = 's')
-  sing_ls <- split(single_out, by = 's.s')
+  
   
   all_states <- unique(legal_a$s)
   short_dist <- as.vector(sapply(all_states, FUN = find_move, target_id = k_terr$s))
   
   dist_dt <- data.table(s = all_states, a = short_dist) 
-  print(dist_dt)
-  #### Rest of stuff
-  matches_s <- 1
   
-  s_vec <- paste0(t(unit_obj[type == 'f',list(id,s)]),collapse = '')
   
-  while(i < n_iter & max(unlist(q$n[matches_s])) < (.1 * n_iter)){
-    
-    acts_new <- last_a
+  while(i < n_iter ){
     
     units_new <- unit_obj
     
     key_terr <- k_terr
     
     j <- 0
-    
-    lst_out <- list()
+    #print(i)
+    lst_out <- data.table()
     
     if(i %% 100 == 0){
       print(paste("Simulation",i))
@@ -360,22 +218,18 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
     
     while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
       
-      #if(j == 0 ){
-        input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
-                                  type = units_new$type, a = acts_new)
+      input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
+                                type = units_new$type)
+      
       time <- Sys.time()
       
-      #print(input_state)
-      #print(units_new)
-      #print(key_terr)
-      #print(input_state[type == 'e',.(s)])
       eny_dist <- left_join(input_state[type == 'e',.(s)],dist_dt, by = "s")$a
-      #print(eny_dist)
+      
       out <- execute_action(state=input_state,actions = legal_a[s %in% input_state$s],grad = terr_loc,
-                            q_lst=q,c=c, lasta = input_state,act_dt = actions_dt,
-                            probdf = single_out, depth = j,prob_b = prob_base, disc = 0.95,
-                            prob_lst = prob_ls, leg_lst = leg_ls,sing_lst = sing_ls, k_t = key_terr,
-                            shrt_dist = eny_dist)
+                            c=c, lasta = input_state,act_dt = actions_dt,
+                            probdf = single_out, depth = j,prob_b = prob_base, disc = gamma,
+                            prob_lst = prob_ls, leg_lst = leg_ls, k_t = key_terr,
+                            shrt_dist = eny_dist, ind_q = ind_q_lst, leg_acts = legal_a)
       
       t1 <- Sys.time()
       
@@ -384,7 +238,11 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
       df_type <- bind_rows(df_type,data.frame(iter = i, depth = j, type = out[[4]]))
       
-      lst_out <- append(lst_out,list(out))
+      lst_temp <- out[[2]][[2]]
+      lst_temp$turn <- j
+      
+      lst_out <- rbind(lst_out,lst_temp)
+
       
       units_new <- data.table(id = c(out[[1]]$id), s = c(out[[1]]$sp),
                               str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a))
@@ -393,11 +251,6 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
       units_new <- units_new[str > 10]
       
-      
-      new_len <- nrow(units_new)
-
-      acts_new <- acts_new[which(units_new$str > 10)]
-
       key_terr <- out[[6]]
 
       units_new[, a:= NULL]
@@ -408,46 +261,43 @@ simulate_mcts <- function(unit_obj,last_a, legal_a, terr_loc, q, c = 5,
       
     }
     
+    setorder(lst_out, id, turn)
+    
+    lst_out[, q_new := rev(Reduce(function(x, y) gamma * x + y, rev(val), accumulate = TRUE)), by = id]
+    
+    #print(lst_out)
+    t1 <- Sys.time()
+    # q_temp <- q_update(lst_out,ind_q_lst, gamma = 0.95, j = k)
+    
+    # for(k in 1:nrow(lst_out)){
+    #   #print(ind_q_lst[[lst_out[[i,2]]]][[lst_out[[i,1]]]][a == lst_out[[i,3]]])
+    #   ind_q_lst[[lst_out[[k,2]]]][[lst_out[[k,1]]]][a == lst_out[[k,3]],n := n + 1]
+    #   ind_q_lst[[lst_out[[k,2]]]][[lst_out[[k,1]]]][a == lst_out[[k,3]],q := q + ((lst_out[[k,6]] - q) / n)]
+    # }
     
     
-    for(k in length(lst_out):1){
-      t1 <- Sys.time()
-      if(k == length(lst_out)){
-        last_val_in <- 0
-        last_val_dt <- data.table(id = unit_obj[type == 'f']$id, val = 0)
-        last_val_in <- list(last_val_in,last_val_dt)
-      }
+    
+    for(k in 1:nrow(lst_out)){
+      dt <- ind_q_lst[[lst_out[[k,2]]]][[lst_out[[k,1]]]]
+      rows_to_update <- dt$a %in% lst_out[[k,3]]
       
-      q_temp <- q_update(q,lst_out[[k]],last_val_in, gamma = 0.95, j = k)
+      # update n
+      set(dt, i = which(rows_to_update), j = "n", value = dt[rows_to_update, n] + 1)
       
-      q <- q_temp[[1]]
-      
-      last_val_in <- q_temp[[2]]
-      
-      df_log <- rbind(df_log, data.table(event = 'q_update',t = Sys.time()-t1))
-      
+      # update q
+      set(dt, i = which(rows_to_update), j = "q", value = dt[rows_to_update, q] + ((lst_out[[k,6]] - dt[rows_to_update, q]) / dt[rows_to_update, n]))
     }
     
-    val <- unlist(q_temp[[2]])
-    val[is.null(val)] <- 0
-    i <- i + 1
+    
+    # ind_q_lst <- q_temp[[5]]
+    
+    df_log <- rbind(df_log, data.table(event = 'q_update',t = Sys.time()-t1))
 
-    matches_s <- q$s$s %in% s_vec
-    
-    matches_s <- which(matches_s)
-    
-    
+    i <- i + 1
   }
-  
-  s_vec <- paste0(t(unit_obj[type == 'f',list(id,s)]),collapse = '')
-  
-  state_in <- q$s$s %in% s_vec
-  
-  
-  lst_new <- data.table(q = unlist(q$q[which(state_in)]), a = (q$a[which(state_in)]))
-  lst_new[order(-q)]
-  total_time <- Sys.time() - time_init
-  return(list(q,lst_new,df_type,df_log,total_time))
+
+  total_time <- Sys.time() - time_stamp
+  return(list(0,df_type,df_log,total_time,ind_q_lst))
 }
 
 
@@ -483,6 +333,38 @@ selfun <- function(state,prob,legal_a,rand){
 }
 
 
+
+## Selection function for naive MCTS ####
+
+selfun2 <- function(dt,lst, c, rand_sel = FALSE) {
+  
+  num <- nrow(lst[[dt[[2]]]][[dt[[1]]]])
+  
+  out <- lst[[dt[[2]]]][[dt[[1]]]][sample(num, 1), ]
+  
+  
+  if(out$n == 0 | rand_sel == TRUE ){
+    out_f <- out
+  } else {
+    out <- lst[[dt[[2]]]][[dt[[1]]]][n>0]
+    print(out)
+    ucb <- out$q + c*sqrt(log(sum(out$n))/out$n)
+    #print(ucb)
+    out_f <- out[which.max(ucb)]
+    print(out_f)
+  }
+  
+  return(out_f)
+}
+
+selfun3 <- function(dt,lst) {
+  
+  num <- lst[[dt[[2]]]][[dt[[1]]]]
+  num
+}
+
+
+### Find the shortest path ####
 
 
 find_move <- function(current_id, target_id) {
@@ -542,3 +424,4 @@ find_move <- function(current_id, target_id) {
   
   return(find_shortest_distance(current_id, target_id))
 }
+

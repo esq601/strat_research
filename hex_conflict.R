@@ -39,50 +39,19 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
 }
 
 
-reward_conf <- function(conf_out, mode = 'mult'){
+reward_conf <- function(conf_out, fight_wt = 0.25, terr_wt = 0.75){
   
-  #targets <- conf_out[[4]][,.N, by = target]
+  rew <- fight_wt*((sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old))  #+
+  #nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
   
-  #target_new <- merge(conf_out[[2]], targets, by.x = 'id',by.y = 'target',)
+  #print(conf_out[[7]])
+  rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,s = conf_out[[1]][order(id)]$s,
+                        a = conf_out[[1]][order(id)]$a,
+                        val = terr_wt*conf_out[[7]])
   
+  rew_ind[id %in% conf_out[[4]]$player, val := val + rew]
   
-  #target_new[which(is.na(target_new)),N := 1]
-  
-  #target_new[, rewval := N * (str_old - str)]
-  #print(target_new)
-
-  
-  if(mode == 'ind'){
-    # print('ughhh')
-    rew <- 1
-    rew_ind <- 1
-  } else{
-    slf <- ifelse(nrow(conf_out[[1]]) >0,
-                  sum((conf_out[[1]]$str_old - conf_out[[1]]$str)),
-                  0)
-    
-    eny <- ifelse(nrow(conf_out[[2]]) >0,
-                  sum((conf_out[[2]]$str_old - conf_out[[2]]$str)),
-                  0)
-    
-    cbts <- length(unique(conf_out[[4]]$player))
-    
-    # rew <- ((1 +(sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))) /
-    #   (1 +(sum(conf_out[[1]]$str_old) - sum(conf_out[[1]]$str)))-1) +
-    #   nrow(conf_out[[2]][str<10]) - nrow(conf_out[[1]][str<10]) #+
-    rew <- (sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old)  +
-      nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
-    
-    rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,
-                          val = ifelse(conf_out[[1]][order(id)]$id %in% conf_out[[4]]$player,1,0))
-    
-
-  }
-    #cbts/length(unique(conf_out[[1]]$id))
-  #print(rew)
-
-  # print(rew_ind)
   return(list(rew,rew_ind))
-
+  
 }
 

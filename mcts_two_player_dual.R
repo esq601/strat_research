@@ -182,7 +182,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   #units[,a := NULL]
   out <- simulate_mcts(unit_bg1,rep('adj0',nrow(unit_bg1)),legal_a = legal_acts,terr_loc=territory, 
                        q=q_work1,c =0.2,
-                       n_iter = 1000, depth =8, single_out = out_single, actions=actions,
+                       n_iter = 1000, depth =8, actions=actions,
                        k_terr = key_tern1)
   
   #q_work1 <- out[[1]]
@@ -225,7 +225,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   selected_a_eny <- c(selected_a[(length(selected_a)-nrow(f_players)+1):length(selected_a)],
                       selected_a[1:nrow(e_target)])
-  cl <- makeCluster(cores[1]/2)
+  cl <- makeCluster(cores[1]/2-1)
   registerDoParallel(cl)
   #i <- 1
   out_single <- foreach(i=1:nrow(f_players), .combine = rbind,.packages = c('data.table','dplyr'),
