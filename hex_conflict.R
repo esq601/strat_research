@@ -43,14 +43,17 @@ reward_conf <- function(conf_out, fight_wt = 0.25, terr_wt = 0.75){
   
   rew <- fight_wt*((sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old))  #+
   #nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
-  
+  # print(rew)
+  # print(conf_out[[4]])
   #print(conf_out[[7]])
   rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,s = conf_out[[1]][order(id)]$s,
                         a = conf_out[[1]][order(id)]$a,
                         val = terr_wt*conf_out[[7]])
   
-  rew_ind[id %in% conf_out[[4]]$player, val := val + rew]
-  
+  rew_ind[id %in% conf_out[[4]][[3]]$player, val := val + rew]
+  # print(conf_out[[4]][[3]])
+  # print(conf_out[[2]])
+   # print(rew_ind)
   return(list(rew,rew_ind))
   
 }

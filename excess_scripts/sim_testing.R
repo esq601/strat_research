@@ -286,3 +286,152 @@ testlst[[1]]
 testlst[[2]]
 
 compare_lists(testlst[[1]],testlst[[2]])
+
+
+
+
+
+#### checking out the tree growth
+
+
+df_tree <- out[[1]]
+
+df_tree1 <- data.table()
+for(turnno in c(1,2,3)){
+  for(unit in c('inf_1','inf_2','inf_3')){
+    for(i in seq(from =0, to = 900, by = 100)){
+      dt_tree_temp <- df_tree[turn == turnno & sim > i & sim < i+100 & id == unit] %>%
+        group_by(s,id,turn) %>%
+        summarise(num = n())
+      
+      dt_tree_temp$window <- i
+      
+      df_tree1 <- rbind(df_tree1, dt_tree_temp)
+    }
+  }
+}
+
+
+
+
+df_tree1 %>%
+  group_by(id,window,turn) %>%
+  summarise(sumt = sum(num))
+
+
+hexdt_tree <- df_tree1 %>%
+  left_join(hexdf2, by = c('s' = 'pos'))
+
+hexdf3 <- as.data.table(hexdf2)
+
+p1 <- ggplot(hexdf3[x_h <= max(hexdt_tree$x_h)], aes(x = x_pos, y = y_pos)) +
+  geom_polygon(data = hexdf3[x_h <= max(hexdt_tree$x_h)],color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = 'grey80') +
+  geom_polygon(data= hexdt_tree,color = 'grey50',aes(group = s,x=x_h, y = y_h,fill = num)) +
+  #geom_point(data = hexdt_kt, aes(y = y_pos+0.5, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 15) +
+  # geom_tile(data = pnew,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
+  # geom_spoke(data =pnew, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
+  #            arrow = arrow(length = unit(0.25, "cm")),size = 1) +
+  # #geom_text(data = pieces, aes(label = id,color = type),vjust = .25) +
+  # geom_image(data=pnew, aes(image = image)) +
+  # scale_fill_distiller(type = "div",direction = 1,limits = c(0,1), palette = "RdYlGn")  +
+  # scale_color_manual(breaks = c('e','f'), values = c('darkred','darkgreen')) +
+  #coord_cartesian(xlim = c(0,20)) +
+  #coord_equal(xlim = c(5,25),ylim = c(0,25)) +
+  # scale_fill_manual(breaks = c('enemy','friendly','non','conflict'), 
+  #                   values = c('darkred','lightgreen','transparent','orange')) +
+  coord_fixed() +
+  facet_wrap(turn~id) +
+  theme_void() +
+  transition_states(window) +
+  view_follow()
+
+
+animate(p1, end_pause = c(0,30))
+
+library(extrafont)
+
+
+ggplot(hexdf3[x_h <= max(hexdt_tree$x_h)], aes(x = x_pos, y = y_pos)) +
+  geom_polygon(data = hexdf3[x_h <= max(hexdt_tree$x_h)],color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
+  geom_polygon(data= hexdt_tree[window == 900],color = 'grey50',aes(group = s,x=x_h, y = y_h,fill = num)) +
+  #geom_point(data = hexdt_kt, aes(y = y_pos+0.5, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 15) +
+  # geom_tile(data = pnew,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
+  # geom_spoke(data =pnew, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
+  #            arrow = arrow(length = unit(0.25, "cm")),size = 1) +
+  # #geom_text(data = pieces, aes(label = id,color = type),vjust = .25) +
+  # geom_image(data=pnew, aes(image = image)) +
+  # scale_fill_distiller(type = "div",direction = 1,limits = c(0,1), palette = "RdYlGn")  +
+  # scale_color_manual(breaks = c('e','f'), values = c('darkred','darkgreen')) +
+  #coord_cartesian(xlim = c(0,20)) +
+  #coord_equal(xlim = c(5,25),ylim = c(0,25)) +
+  # scale_fill_manual(breaks = c('enemy','friendly','non','conflict'), 
+#                   values = c('darkred','lightgreen','transparent','orange')) +
+coord_fixed() +
+  scale_fill_distiller(type='seq', palette =12, direction = 1) +
+  facet_wrap(id~turn) +
+  theme_void() +
+  labs(title = "State Exploration by Unit and Depth",
+       subtitle = "Simulations 900 - 1000",
+       fill = "# Visits") +
+  theme(
+    text = element_text(family = 'Bahnschrift'),
+    plot.background =   element_rect(fill = 'white', color = 'transparent')
+  )
+
+ggsave('images/depth_900.png',height = 8, width =5 , dpi = 320)
+
+df
+tree2 <- df_tree %>%
+  select(-val) %>%
+  pivot_wider(names_from = id, values_from = c(s,a)) %>%
+  mutate(id_val = paste(turn,s_inf_1,s_inf_2,s_inf_3, sep = '_')) %>%
+  select(state = id_val, level = turn, sim )
+
+install.packages("igraph")
+install.packages("ggraph")
+install.packages("tidygraph")
+
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(stringr)
+library(extrafont)
+#write_csv(df_tree,'data/df_tree.csv',)
+
+# arrange the data by simulation and level
+df <- tree2[order(tree2$sim, tree2$level), ]
+
+# create an edge list
+edges <- data.frame(
+  from = df$state[-nrow(df)],  # all states except the last one
+  to = df$state[-1],           # all states except the first one
+  sim = df$sim[-nrow(df)]      # corresponding simulation number
+) %>%
+  filter(stringr::str_detect(stringr::str_sub(to,1,1),"0") == FALSE)
+
+#str_sub(edges$to,1,1)
+# create a graph
+graph <- graph_from_data_frame(edges, directed=TRUE)
+
+
+# create a tidygraph object from the igraph object
+tg <- as_tbl_graph(graph)
+
+# visualize the graph
+ggraph(tg, layout = 'tree') +
+  geom_edge_link(edge_width = 0.25) +
+  geom_node_point() +
+  theme_graph() +
+  labs(title = "Search Tree",
+       subtitle = "Three Units, 1000 Simulations") +
+  theme(
+    text = element_text(family = 'Bahnshrift'),
+    plot.background = element_rect(fill = 'white', color = 'transparent')
+  )
+
+
+ggsave('search_tree.png', width = 12, height = 6, dpi = 640)
+
+tree3 <- tree2 %>%
+  group_by(level) %>%
+  summarise(distnum = n_distinct(state))

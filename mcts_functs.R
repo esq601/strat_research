@@ -1,5 +1,5 @@
 library(data.table)
-library(clue)
+
 source('hex_setup.R')
 source('hex_conflict.R')
 source('hex_funcs.R')
@@ -177,6 +177,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
   avg_u <- 0
   bigval <- 0
   i <- 0
+  lst_log <- data.table()
   df_type <- data.frame()
   time_stamp <- Sys.time()
   actions_dt <- data.table(actions)
@@ -261,6 +262,10 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
       
     }
     
+    lst_out1 <- copy(lst_out)
+    lst_out1$sim <- i
+    lst_log <- rbind(lst_log,lst_out1)
+    
     setorder(lst_out, id, turn)
     
     lst_out[, q_new := rev(Reduce(function(x, y) gamma * x + y, rev(val), accumulate = TRUE)), by = id]
@@ -297,7 +302,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
   }
 
   total_time <- Sys.time() - time_stamp
-  return(list(0,df_type,df_log,total_time,ind_q_lst))
+  return(list(lst_log,df_type,df_log,total_time,ind_q_lst))
 }
 
 

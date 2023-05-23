@@ -1,18 +1,22 @@
 source('mcts_functs.R')
-source('mcts_one_funcs.R')
 library(clue)
+library(foreach)
+library(doParallel)
 #### start the thing
 
 
 
-numu <- 3
-nume <- 1
+numu <- 10
+nume <- 10
 # 
+
+#paste0(ifelse(1:10<10,"0",""),1:10)
 f_players <- data.table(
-  id = paste0("inf_",1:numu),
-  s = c('050708','060606','040709'),
+  id = paste0("inf_",paste0(ifelse(1:numu<10,"0",""),1:numu)),
+  s = c('081210','081109','111207','111106','131205',
+        '061010','101006','080907','101309','061111'),
   #s = posf$pos,
-  str = c(40),
+  str = c(100),
 
   type = 'f'
 )
@@ -20,8 +24,9 @@ f_players <- data.table(
 
 e_target <- data.table(
   #id = c('inf_a','inf_b'),
-  id = paste0("eny_",1:nume),
-  s = c('091108'),
+  id = paste0("eny_",paste0(ifelse(1:nume<10,"0",""),1:nume)),
+  s = c('162010','141810','151809','151708','161808',
+        '151607','161606','161707','141507','131609'),
   #s = c('091108','091007','091209','111106','091310','101208'),
   #s = pose$pos,
   str = c(100),
@@ -66,7 +71,7 @@ territory[,lst := Map(list,x_pos,y_pos)]
 q_work1 <- 0
 
 
-key_tern <- data.table(s = c('040507'), value = c(1), type = 'f')
+key_tern <- data.table(s = c('050607','091108','151102'), value = c(1), type = 'f')
 
 units_eny <- copy(units)
 units_eny[,type := ifelse(type == 'e','f','e')]
@@ -74,13 +79,15 @@ units_eny[,type := ifelse(type == 'e','f','e')]
 # ind_q <- q_setup(units, data.table(legal_acts))
 # ind_q_eny <- q_setup(units_eny, data.table(legal_acts))
 
-while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 25){
+turn_lim <- 25
+
+while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= turn_lim){
   
   time_turn <- Sys.time()
   print(turn)
   
 
-  
+  depth_val <- min(15, max(1,turn_lim-turn))
   
   units_eny <- copy(units)
   eny_tern <- copy(key_tern)
@@ -102,7 +109,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                       if(type_chr == 'f'){
                         out <- simulate_mcts(units,ind_q_in = ind_q,legal_a = legal_acts,terr_loc=territory, 
                                              q=q_work1,c =1.5,
-                                             n_iter = 1000, depth =8,  actions=actions,
+                                             n_iter = 500, depth =depth_val,  actions=actions,
                                              k_terr = key_tern, gamma =0.95)
                         
                         out
@@ -111,7 +118,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                         
                         out_eny <- simulate_mcts(units_eny,ind_q_in = ind_q_eny,legal_a = legal_acts,terr_loc=territory, 
                                                  q=q_work1,c =1.5,
-                                                 n_iter = 1000, depth =8,  actions=actions,
+                                                 n_iter = 500, depth =depth_val,  actions=actions,
                                                  k_terr = eny_tern, gamma = 0.95)
                         out_eny
                       }
@@ -124,7 +131,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   out_lst <- out[[5]]
   #ind_q <- out[[5]]
   
-  out_lst[['050708']]
+  out_lst[['111207']]
   act_vec_f <- vector()
   units_select <- data.table()
 #units
@@ -227,7 +234,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   turn <- turn + 1
   #units_log[,bg := NULL]
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  #write_csv(units_log, 'results/mcts_test_two_player_18may2.csv')
+  write_csv(units_log, 'results/mcts_test_two_player_23may.csv')
   print(paste("Turn time:",lubridate::as.duration(Sys.time()-time_turn)))
   
 }

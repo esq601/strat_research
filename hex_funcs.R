@@ -411,10 +411,10 @@ transition_function2 <- function(plrs,trgt,key_terrain){
   }
   ob6 <-  Sys.time()-t1
 
-  print(c(ob1,ob2,ob3,ob4,ob5,ob6))
-  print(sum(ob1,ob2,ob3,ob4,ob5,ob6))
-  print(paste("total",(Sys.time()-t0)))
-  print(paste('dif',(Sys.time()-t0) - sum(ob1,ob2,ob3,ob4,ob5,ob6)) )
+  # print(c(ob1,ob2,ob3,ob4,ob5,ob6))
+  # print(sum(ob1,ob2,ob3,ob4,ob5,ob6))
+  # print(paste("total",(Sys.time()-t0)))
+  # print(paste('dif',(Sys.time()-t0) - sum(ob1,ob2,ob3,ob4,ob5,ob6)) )
   
   #print(paste("Total:", Sys.time()-t0))
   # df_t <- rbind(df_t, data.table(event = 'ex4_conflict',t = Sys.time()-t1))
