@@ -7,7 +7,7 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
     fexp <- 1
     texp <- 1
       
-      # print(conflicts)
+    #print(conflicts)
     ppower <- conflicts[,by= player, .(engs_plr =uniqueN(target))]
     
     ppower[pl, on = 'player == id', atk_plr := str/engs_plr]
@@ -18,7 +18,7 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
     
     
     fight_tbl <- conflicts[tpower, on = "target"]
-    #print(fight_tbl)
+    print(fight_tbl)
     fight_tbl <- fight_tbl[ppower, on = 'player']
     
     fight_tbl$plr_mod <- fight_tbl$atk_tgt*emod
@@ -41,16 +41,30 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
 
 reward_conf <- function(conf_out, fight_wt = 0.25, terr_wt = 0.75){
   
+
+  
   rew <- fight_wt*((sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old))  #+
   #nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
   # print(rew)
   # print(conf_out[[4]])
   #print(conf_out[[7]])
+  # if(conf_out[[2]]$str < 30){
+  #   print(conf_out[[2]])
+  #   print(rew)
+  # }
+
   rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,s = conf_out[[1]][order(id)]$s,
                         a = conf_out[[1]][order(id)]$a,
                         val = terr_wt*conf_out[[7]])
   
+
+  
   rew_ind[id %in% conf_out[[4]][[3]]$player, val := val + rew]
+  
+  # if(conf_out[[2]]$str < 30){
+  #   #(conf_out[[2]])
+  #   print(rew_ind)
+  # }
   # print(conf_out[[4]][[3]])
   # print(conf_out[[2]])
    # print(rew_ind)

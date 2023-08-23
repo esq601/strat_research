@@ -158,13 +158,14 @@ gradient_function <- function(players,target){
 
 
 
-conf_check2 <- function(players,target){
+conf_check2 <- function(players,target,lanc){
   df_t <- data.table()
   # t1 <- Sys.time()
   out <- data.table()
   
   if(nrow(players) > 0 & nrow(target) > 0){
-    
+    # print(players)
+    # print(target)
     f_vec <- lapply(players$sp,
                     function(x) c(as.integer(substr(x, 1, 2)), 
                                   as.integer(substr(x, 3, 4)),
@@ -183,32 +184,64 @@ conf_check2 <- function(players,target){
     matches1 <- compare_lists(e_vec, f_vec)
     # print('Lists')
     # print(matches)
-    # print('list2')
+    # # print('list2')
     # print(matches1)
-    # print('vectors')
+    # # print('vectors')
     # print(unlist(matches))
-    # 
+    # # 
     # print((unlist(matches1)))
 
     # df_t <- rbind(df_t, data.table(event = 'conf2_comp',t = Sys.time()-t1))
     # #print(matches)
     # t1 <- Sys.time()
     
-    plt <- players[unlist(matches1),.(player = id,f_str = str)]
-    plt$fmod <- 0.25
-    # print(plt)
-    plt[,f_str := fmod*(f_str / .N), by = player]
-    tgt <- target[unlist(matches),.(target = id,e_str = str)]
-    tgt$emod <- 0.25
-    tgt[,e_str := emod*(e_str / .N), by = target]
-    #print(plt)
+    plt <- players[unlist(matches1),.(player = id,cls_p = class,side_p = type,f_str = str,a_p = a)]
+    tgt <- target[unlist(matches),.(target = id,cls_t = class,side_t = type,e_str = str, a_t = a)]
     out <- cbind(plt,tgt)
-    # print(out)
+    #print(out)
+    
+    
+    
+    out <- merge(
+      out, lanc, 
+      by.x = c("cls_p", "side_p", "cls_t", "side_t"),
+      by.y = c("shooter_class", "shooter_side", "target_class", "target_side"),
+      all.x = TRUE,
+      suffixes = c("", "_fmod")
+    )
+    
+    # Rename and remove unwanted columns
+    setnames(out, "mod", "fmod")
+    
+    # Adding emod
+    out <- merge(
+      out, lanc, 
+      by.x = c("cls_t", "side_t", "cls_p", "side_p"),
+      by.y = c("shooter_class", "shooter_side", "target_class", "target_side"),
+      all.x = TRUE,
+      suffixes = c("", "_emod")
+    )
+    
+    # Rename and remove unwanted columns
+    setnames(out, "mod", "emod")
+    
+    
+    #out$fmod <- 0.25
+    #print(plt)
+    out[, fmod := ifelse(a_p == "adj0", fmod * (1/.9), fmod * .9)] # Modification for being on defense
+    out[,f_str := fmod*(f_str / .N), by = player]
+
+    #out$emod <- 0.25
+    out[, emod := ifelse(a_t == "adj0", emod * (1/.9), emod * .9)] # Modification for being on defense
+    out[,e_str := emod*(e_str / .N), by = target]
+    #print(plt)
+
+    print(out)
     
     eout <- out[, .(mod = floor(sum(f_str))), by = target]
     fout <- out[, .(mod = floor(sum(e_str))), by = player]
-    # print(fout)
-    # print(eout)
+    print(fout)
+    print(eout)
     
     # df_t <- rbind(df_t, data.table(event = 'conf3_loop',t = Sys.time()-t1))
     
@@ -243,7 +276,7 @@ find_indices <- function(num, vec) {
 
 
 
-transition_function2 <- function(plrs,trgt,key_terrain){
+transition_function2 <- function(plrs,trgt,key_terrain,lanc){
   
   t0 <-Sys.time()
   
@@ -378,7 +411,7 @@ transition_function2 <- function(plrs,trgt,key_terrain){
   ob4 <-  Sys.time()-t1
   t1 <- Sys.time()
   
-  conf_all <- conf_check2(plrs,trgt)
+  conf_all <- conf_check2(plrs,trgt,lanc)
   
   #conf_all <- conf_all[[1]]
   

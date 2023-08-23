@@ -1,8 +1,23 @@
-source('mcts_functs.R')
-source('mcts_one_funcs.R')
-library(clue)
+source('MCTS_naive/mcts_functs.R')
+
+
+
+
 #### start the thing
 
+# Specify the package name
+package_name <- "clue"
+
+# Check if the package is already installed
+if (!requireNamespace(package_name, quietly = TRUE)) {
+  # Install the package
+  install.packages(package_name, repos = 'https://cran.wustl.edu/')
+}
+
+# Load the package
+library(package_name, character.only = TRUE)
+library(foreach)
+library(doParallel)
 
 
 numu <- 3
@@ -14,8 +29,7 @@ f_players <- data.table(
   #s = posf$pos,
   str = c(40),
 
-  type = 'f',
-  class = c('inf','inf','inf')
+  type = 'f'
 )
 
 
@@ -28,30 +42,15 @@ e_target <- data.table(
   str = c(100),
 
   #sp = c('071009','081008'),
-  type = 'e',
-  class = c('inf')
+  type = 'e'
 )
-# f_players <- data.table(
-#   id = paste0("inf_",1:numu),
-#   s = c('040608','030609','040810','060606','060404','070706'),
-#   #s = posf$pos,
-#   str = c(100),
-# 
-#   type = 'f'
-# )
-# 
-# 
-# e_target <- data.table(
-#   #id = c('inf_a','inf_b'),
-#   id = paste0("eny_",1:nume),
-#   s = c('091310','101208','091209','111106','091108','091007'),
-#   #s = c('091108','091007','091209','111106','091310','101208'),
-#   #s = pose$pos,
-#   str = c(100,100),
-# 
-#   #sp = c('071009','081008'),
-#   type = 'e'
-# )
+
+# Generate a unique identifier with a random component
+unique_id <- paste0(format(Sys.time(), "%Y%m%d%H%M%S"), sample(1:100000, 1))
+
+# Use the unique identifier in your file name
+file_name <- paste0("process_updated_", unique_id, ".csv")
+
 
 legal_acts <- data.table(adj_df)
 
@@ -65,8 +64,8 @@ actions <- c(paste0("adj",0:6))
 
 territory <- data.table(df2[,c('pos','x_pos','y_pos')])
 territory[,lst := Map(list,x_pos,y_pos)]
-q_work_f <- 0
-q_work_e <- 0
+q_work1 <- 0
+
 
 key_tern <- data.table(s = c('040507'), value = c(1), type = 'f')
 
@@ -76,12 +75,13 @@ units_eny[,type := ifelse(type == 'e','f','e')]
 # ind_q <- q_setup(units, data.table(legal_acts))
 # ind_q_eny <- q_setup(units_eny, data.table(legal_acts))
 
+
 while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 25){
   
   time_turn <- Sys.time()
   print(turn)
   
-
+  
   
   
   units_eny <- copy(units)
@@ -96,30 +96,30 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   cl <- makeCluster(2)
   registerDoParallel(cl)
-  type_chr = 'f'
+  #type_chr = 'f'
   out <- foreach(type_chr = c('f','e'),.combine = c,.packages = c('data.table','dplyr','clue'),
-                    .inorder = FALSE, .verbose = FALSE,
-                    .export = c('actions_samp','trunc_func','grad_reward')) %dopar% {
-                      
-                      if(type_chr == 'f'){
-                        out <- simulate_mcts(units,ind_q_in = ind_q,legal_a = legal_acts,terr_loc=territory, 
-                                             q=q_work_f,c =1.5,
-                                             n_iter = 1000, depth =8,  actions=actions,
-                                             k_terr = key_tern, gamma =0.95,lanc_df = u_lanchester)
-                        
-                        out
-                        
-                      } else {
-                        
-                        out_eny <- simulate_mcts(units_eny,ind_q_in = ind_q_eny,legal_a = legal_acts,terr_loc=territory, 
-                                                 q=q_work_e,c =1.5,
-                                                 n_iter = 1000, depth =8,  actions=actions,
-                                                 k_terr = eny_tern, gamma = 0.95,lanc_df = u_lanchester)
-                        out_eny
-                      }
-                      
-                    }
-
+                 .inorder = FALSE, .verbose = FALSE,
+                 .export = c('actions_samp','trunc_func','grad_reward')) %dopar% {
+                   
+                   if(type_chr == 'f'){
+                     out <- simulate_mcts(units,ind_q_in = ind_q,legal_a = legal_acts,terr_loc=territory, 
+                                          q=q_work_f,c =1.5,
+                                          n_iter = 1000, depth =8,  actions=actions,
+                                          k_terr = key_tern, gamma =0.95)
+                     
+                     out
+                     
+                   } else {
+                     
+                     out_eny <- simulate_mcts(units_eny,ind_q_in = ind_q_eny,legal_a = legal_acts,terr_loc=territory, 
+                                              q=q_work_e,c =1.5,
+                                              n_iter = 1000, depth =8,  actions=actions,
+                                              k_terr = eny_tern, gamma = 0.95)
+                     out_eny
+                   }
+                   
+                 }
+  
   stopCluster(cl)
   registerDoSEQ()
   
@@ -131,7 +131,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   #out_lst[['050607']]
   act_vec_f <- vector()
   units_select <- data.table()
-#units
+  #units
   
   
   for(i in 1:nrow(units[type == 'f']) ) {
@@ -165,7 +165,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   
   act_vec_f <- units_select$a
-
+  
   
   
   out_lst_e <- out[[10]]
@@ -232,7 +232,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   turn <- turn + 1
   #units_log[,bg := NULL]
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  #write_csv(units_log, 'results/mcts_test_two_player_18may2.csv')
+  write_csv(units_log, paste0('results/trial_3on1/',file_name))
   print(paste("Turn time:",lubridate::as.duration(Sys.time()-time_turn)))
   
 }

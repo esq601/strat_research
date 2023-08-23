@@ -79,15 +79,13 @@ units_eny[,type := ifelse(type == 'e','f','e')]
 # ind_q <- q_setup(units, data.table(legal_acts))
 # ind_q_eny <- q_setup(units_eny, data.table(legal_acts))
 
-turn_lim <- 25
-
-while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= turn_lim){
+while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 25){
   
   time_turn <- Sys.time()
   print(turn)
   
 
-  depth_val <- min(15, max(1,turn_lim-turn))
+  
   
   units_eny <- copy(units)
   eny_tern <- copy(key_tern)
@@ -109,7 +107,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                       if(type_chr == 'f'){
                         out <- simulate_mcts(units,ind_q_in = ind_q,legal_a = legal_acts,terr_loc=territory, 
                                              q=q_work1,c =1.5,
-                                             n_iter = 500, depth =depth_val,  actions=actions,
+                                             n_iter = 500, depth =5,  actions=actions,
                                              k_terr = key_tern, gamma =0.95)
                         
                         out
@@ -118,7 +116,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                         
                         out_eny <- simulate_mcts(units_eny,ind_q_in = ind_q_eny,legal_a = legal_acts,terr_loc=territory, 
                                                  q=q_work1,c =1.5,
-                                                 n_iter = 500, depth =depth_val,  actions=actions,
+                                                 n_iter = 500, depth =5,  actions=actions,
                                                  k_terr = eny_tern, gamma = 0.95)
                         out_eny
                       }

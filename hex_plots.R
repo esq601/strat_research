@@ -4,31 +4,38 @@ source("hex_setup.R")
 # Plot of the field
 
 ggplot(hexdf1, aes (x=x_h, y = y_h,group = pos)) +
-  geom_polygon(color = 'black', fill = 'transparent') +
+  geom_polygon(color = 'black', fill = 'grey90') +
   coord_equal() +
-  theme_void()
+  theme_void() 
+
+ggsave('blankplot.jpeg',height = 8, width = 6,dpi = 320)
 
 #Some plots
+
+hexloc <- hexdf2a %>%
+  select(pos,x_pos,y_pos) %>%
+  distinct()
 
 ggplot(hexdf2, aes (x=x_h, y = y_h)) +
   geom_polygon(color = 'black',aes(group = pos,fill = disp)) +
   geom_point(data = cities, aes(x = x_pos, y = y_pos), size = 4) +
+  geom_text(data = hexloc, aes(x = x_pos, y = y_pos, label = pos)) +
   coord_equal() +
   scale_fill_manual(breaks = c('friendly','enemy','neutral'), 
-                    values = c('#449c59','#e34339','transparent'),
-                    labels = c("Arbathian","Donovian","None")) +
+                    values = c('#0492c2','#e34339','transparent'),
+                    labels = c("Blue","Red","None")) +
   theme_void() +
   labs(
     title = "Initial Territorial Disposition",
     fill = "Affiliation",
-    subtitle = "Key Cities Represented as Dots"
+    subtitle = "Cities Represented as Dots"
   ) +
   theme(
     plot.title = element_text(hjust=.5),
     plot.subtitle = element_text(hjust = 0.5)
   )
 
-ggsave('hex_territory.png',width = 5,height = 4, units = 'in')
+ggsave('hex_territory.png',width = 5,height = 4,dpi = 320, units = 'in')
 
 #Plot with different 'area types'
 

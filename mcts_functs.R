@@ -8,7 +8,7 @@ source('hex_funcs.R')
 
 execute_action <- function(state,actions,grad,c,
                            lasta,act_dt, probdf, depth,prob_b,
-                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist, ind_q,leg_acts) {
+                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist, ind_q,leg_acts,lanc) {
 
   
   state <- state[order(-type)]
@@ -88,7 +88,7 @@ execute_action <- function(state,actions,grad,c,
   
   t2 <- Sys.time()
   
-  trans <- transition_function2(move[type == 'f'],move[type == 'e'],k_t)
+  trans <- transition_function2(move[type == 'f'],move[type == 'e'],k_t,lanc)
   
   df_t <- rbind(df_t, data.table(event = 'transition_func',t = Sys.time()-t2))
   df_t <- rbind(df_t,trans[[5]])
@@ -172,7 +172,7 @@ q_setup <- function(unit_obj, legal_a){
 }
 
 simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
-                          n_iter = 250, depth = 5, actions,k_terr, gamma = 0.95){
+                          n_iter = 250, depth = 5, actions,k_terr, gamma = 0.95,lanc_df){
   
   avg_u <- 0
   bigval <- 0
@@ -220,7 +220,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
     while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
       
       input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
-                                type = units_new$type)
+                                type = units_new$type, class = units_new$class)
       
       time <- Sys.time()
       
@@ -230,7 +230,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
                             c=c, lasta = input_state,act_dt = actions_dt,
                             probdf = single_out, depth = j,prob_b = prob_base, disc = gamma,
                             prob_lst = prob_ls, leg_lst = leg_ls, k_t = key_terr,
-                            shrt_dist = eny_dist, ind_q = ind_q_lst, leg_acts = legal_a)
+                            shrt_dist = eny_dist, ind_q = ind_q_lst, leg_acts = legal_a,lanc = lanc_df)
       
       t1 <- Sys.time()
       
@@ -246,7 +246,8 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
 
       
       units_new <- data.table(id = c(out[[1]]$id), s = c(out[[1]]$sp),
-                              str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a))
+                              str = c(out[[1]]$str), type = c(out[[1]]$type), a = c(out[[1]]$a),
+                              class = c(out[[1]]$class))
       
       old_len <- nrow(units_new)
       

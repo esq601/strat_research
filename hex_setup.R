@@ -113,7 +113,7 @@ hexdf2 <- hexdf1 %>%
   left_join(df2, by = 'pos') %>%
   mutate(selected = case_when(pos == tile ~T,T ~ F)) %>%
   mutate(disp = case_when(
-    z > 17 | x > 17 & y > 16 ~'enemy',
+    z > 16 | x > 17 & y > 16 ~'enemy',
     T ~ 'friendly'
   )) %>%
   mutate(goals = sample(c('#8ab597','#9cc797'), 1, prob = c(.2,.8)))
