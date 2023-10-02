@@ -1,36 +1,39 @@
 source('mcts_functs.R')
-source('mcts_one_funcs.R')
+#source('mcts_one_funcs.R')
+source('initation_script.R')
 library(clue)
+library(foreach)
+library(doParallel)
 #### start the thing
 
 
-
-numu <- 3
-nume <- 1
 # 
-f_players <- data.table(
-  id = paste0("inf_",1:numu),
-  s = c('050708','060606','040709'),
-  #s = posf$pos,
-  str = c(40),
-
-  type = 'f',
-  class = c('inf','inf','inf')
-)
-
-
-e_target <- data.table(
-  #id = c('inf_a','inf_b'),
-  id = paste0("eny_",1:nume),
-  s = c('091108'),
-  #s = c('091108','091007','091209','111106','091310','101208'),
-  #s = pose$pos,
-  str = c(100),
-
-  #sp = c('071009','081008'),
-  type = 'e',
-  class = c('inf')
-)
+# numu <- 3
+# nume <- 1
+# # 
+# f_players <- data.table(
+#   id = paste0("inf_",1:numu),
+#   s = c('050708','060606','040709'),
+#   #s = posf$pos,
+#   str = c(40),
+# 
+#   type = 'f',
+#   class = c('inf','inf','inf')
+# )
+# 
+# 
+# e_target <- data.table(
+#   #id = c('inf_a','inf_b'),
+#   id = paste0("eny_",1:nume),
+#   s = c('091108'),
+#   #s = c('091108','091007','091209','111106','091310','101208'),
+#   #s = pose$pos,
+#   str = c(100),
+# 
+#   #sp = c('071009','081008'),
+#   type = 'e',
+#   class = c('inf')
+# )
 # f_players <- data.table(
 #   id = paste0("inf_",1:numu),
 #   s = c('040608','030609','040810','060606','060404','070706'),
@@ -55,11 +58,12 @@ e_target <- data.table(
 
 legal_acts <- data.table(adj_df)
 
-units <- rbind(f_players,e_target)
+# units <- rbind(f_players,e_target)
 
 
 units_log <- data.table()
-turn <- 0
+ter_log <- data.table()
+turn <- 1
 
 actions <- c(paste0("adj",0:6))
 
@@ -67,16 +71,17 @@ territory <- data.table(df2[,c('pos','x_pos','y_pos')])
 territory[,lst := Map(list,x_pos,y_pos)]
 q_work_f <- 0
 q_work_e <- 0
-
-key_tern <- data.table(s = c('040507'), value = c(1), type = 'f')
+# 
+# key_tern <- data.table(s = c('040507'), value = c(1), type = 'f')
 
 units_eny <- copy(units)
+
 units_eny[,type := ifelse(type == 'e','f','e')]
 
 # ind_q <- q_setup(units, data.table(legal_acts))
 # ind_q_eny <- q_setup(units_eny, data.table(legal_acts))
 
-while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn <= 25){
+while(max(units[type == 'f']$str) > 30 & max(units[type == 'e']$str) > 30 & turn <= n_t){
   
   time_turn <- Sys.time()
   print(turn)
@@ -85,14 +90,16 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   
   units_eny <- copy(units)
+  units_eny_full <- copy(units_full)
   eny_tern <- copy(key_tern)
   
   units_eny[,type := ifelse(type == 'e','f','e')]
+  units_eny_full[,type := ifelse(type == 'e','f','e')]
   eny_tern[,type := ifelse(type == 'e','f','e')]
   units_eny <- units_eny[order(-type,id)]
   
-  ind_q <- q_setup(units, data.table(legal_acts))
-  ind_q_eny <- q_setup(units_eny, data.table(legal_acts))
+  ind_q <- q_setup(units_full, data.table(legal_acts))
+  ind_q_eny <- q_setup(units_eny_full, data.table(legal_acts))
   
   cl <- makeCluster(2)
   registerDoParallel(cl)
@@ -103,18 +110,20 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
                       
                       if(type_chr == 'f'){
                         out <- simulate_mcts(units,ind_q_in = ind_q,legal_a = legal_acts,terr_loc=territory, 
-                                             q=q_work_f,c =1.5,
-                                             n_iter = 1000, depth =8,  actions=actions,
-                                             k_terr = key_tern, gamma =0.95,lanc_df = u_lanchester)
+                                             q=q_work_f,c =n_c,n_turns = n_t,
+                                             n_iter = n_iter, depth =8,  actions=actions,
+                                             k_terr = key_tern, gamma =n_gamma,lanc_df = bel_lanc,turnval = turn,
+                                             ind_f = cur_index, ind_e = e_index, afil_val = 'f', opp_val = 'e')
                         
                         out
                         
                       } else {
                         
                         out_eny <- simulate_mcts(units_eny,ind_q_in = ind_q_eny,legal_a = legal_acts,terr_loc=territory, 
-                                                 q=q_work_e,c =1.5,
-                                                 n_iter = 1000, depth =8,  actions=actions,
-                                                 k_terr = eny_tern, gamma = 0.95,lanc_df = u_lanchester)
+                                                 q=q_work_e,c =n_c,n_turns = n_t,
+                                                 n_iter = n_iter, depth =8,  actions=actions,
+                                                 k_terr = eny_tern, gamma = n_gamma,lanc_df = bel_lanc,turnval = turn,
+                                                 ind_f = cur_index, ind_e = e_index, afil_val = 'e', opp_val = 'f')
                         out_eny
                       }
                       
@@ -128,7 +137,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   # q_work_e <- out[[10]]
   ind_q <- out[[5]]
   
-  #out_lst[['050607']]
+  out_lst[['101107']]
   act_vec_f <- vector()
   units_select <- data.table()
 #units
@@ -160,18 +169,20 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   # Create a final data.table based on the optimal assignment
   opt_move <- data.table(id = wide_dt$id, sp = colnames(cost_matrix)[assignment], qn_sum = cost_matrix[cbind(seq_len(nrow(cost_matrix)), assignment)])
   
-  #print(opt_move)
+  print(opt_move)
   units_select <- units_select[opt_move, on = .(id, sp)]
   
   
-  act_vec_f <- units_select$a
+  act_vec_f <- units_select[order(id)]$a
 
   
   
   out_lst_e <- out[[10]]
   ind_q_eny <- out[[10]]
+  # out_lst_e <- out_eny[[5]]
+  # ind_q_eny <- out_eny[[5]]
   
-  out_lst_e[['070807']]#$eny_4
+  out_lst_e[['141810']]#$eny_4
   act_vec_e <- vector()
   units_select_e <- data.table()
   
@@ -207,10 +218,10 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   
   
-  act_vec_e <- units_select_e$a
-  
-  units[,a:= 'adj0']
-  units[,a :=c(act_vec_f,act_vec_e)]
+  act_vec_e <- units_select_e[order(id)]$a
+  units[order(-type,id)]
+  units[order(-id),a:= 'adj0']
+  units[order(-type,id),a :=c(act_vec_f,act_vec_e)]
   #units[,a :=c(out[[2]][order(-q)][[1,2]],c('adj6','adj0','adj5')) ]
   
   
@@ -218,17 +229,17 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   move <- legal_acts[units, on = .(s,a)]
   #print(move)
   #move[,param := NULL]
-  trans <- transition_function2(move[type == 'f'],move[type == 'e'],key_terrain = key_tern)
+  trans <- transition_function2(move[type == 'f'],move[type == 'e'],key_terrain = key_tern,lanc = u_lanchester)
   #print(trans)
   #print(out[[2]])
   
   key_tern <- trans[[6]]
   
-  units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,s=sp,str,type)]
+  units <- rbind(trans[[1]][order(id)],trans[[2]][order(id)])[,list(id,class,s=sp,str,type)]
   
   ### Remove lost units
   
-  units <- units[str>10]
+  units <- units[str>30]
   
   ### Add reinforcements
   
@@ -241,7 +252,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
         
         new_u <- data.frame(class = rein_class[i], type = rein_type[i],str = 100)
         
-        if(rein_type[i] == 'f' & key_tern[s == '091108']$type == 'f'){
+        if(rein_type[i] == 'f' & key_tern[s == '081210']$type == 'f'){
           
           if(length(f_rein_areas_fwd[!f_rein_areas_fwd %in% units$s]) > 0){
             
@@ -255,7 +266,7 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
             cur_index <- cur_index + 1
           }
           
-        } else if(rein_type[i] == 'f' & key_tern[s == '091108']$type == 'f'){
+        } else if(rein_type[i] == 'f' & key_tern[s == '081210']$type == 'f'){
           
           if(length(f_rein_areas_rear[!f_rein_areas_rear %in% units$s]) > 0 ){
             
@@ -296,10 +307,17 @@ while(max(units[type == 'f']$str) > 10 & max(units[type == 'e']$str) > 10 & turn
   
   
   
-  turn <- turn + 1
+
   #units_log[,bg := NULL]
   units_log <- cbind(rbind(units_log,cbind(trans[[1]],turn),cbind(trans[[2]],turn)))
-  #write_csv(units_log, 'results/mcts_test_two_player_18may2.csv')
+  ter_log <- cbind(rbind(ter_log,cbind(trans[[6]],turn),cbind(trans[[6]],turn)))
+  
+  
+  turn <- turn + 1
+  write_csv(units_log, paste0('results/outcome/strat_unit_',file_name))
+  write_csv(ter_log, paste0('results/outcome/strat_terr_',file_name))
+  
+  
   print(paste("Turn time:",lubridate::as.duration(Sys.time()-time_turn)))
   
 }

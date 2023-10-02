@@ -1,6 +1,13 @@
 #Triangular sample function 
 library(data.table)
 
+# Generate a unique identifier with a random component
+unique_id <- paste0(format(Sys.time(), "%Y%m%d%H%M%S"), sample(1:100000, 1))
+
+# Use the unique identifier in your file name
+file_name <- paste0("strat_", unique_id, ".csv")
+
+
 rtri <- function(a,b,c){
   x <- runif(1)
   
@@ -18,7 +25,7 @@ rtri <- function(a,b,c){
 ###Hyperparameters
 
 #Set the number of iterations for MCTS
-n_iter <- 5000
+n_iter <- 300
 
 #Set the number of time periods
 n_t <- 24
@@ -64,11 +71,11 @@ u_fc <- if(d_modernize == "Current") {
 #Enemy Armor Reinforcements
 #Assuming Mean of 2
 
-u_e_arm_rein <- rbinom(24,1,1/12)
+u_e_arm_rein <- rbinom(n_t,1,1/12)
 
 #Enemy Infantry Reinforcements
 #Assuming Mean of 4
-u_e_inf_rein <- rbinom(24,1,1/6)
+u_e_inf_rein <- rbinom(n_t,1,1/6)
 
 #Friendly Infantry Reinforcements | Mobilization
 
@@ -129,11 +136,11 @@ if(d_mobilize == "Full"){
 
 
 
-f_units$id <- paste(f_units$class,f_units$type,1:nrow(f_units),sep = '_')
+f_units$id <- paste(f_units$class,f_units$type,10:(nrow(f_units)+9),sep = '_')
 
 f_units
 
-cur_index <- nrow(f_units) +1
+cur_index <- nrow(f_units) +10
 
 
 #Lanchester Values
@@ -143,12 +150,12 @@ if(d_modernize == 'Current') {
                              target_side = c(rep('e',4),rep('f',4)),
                              target_class = c(rep(c('inf','arm'),4)),
                              mod = c(
-                               rtri(.05,.15,.1),
-                               rtri(.02,.1,.05),
+                               rtri(.05,.2,.15),
+                               rtri(.02,.1,.075),
                                rtri(.075,.15,.125),
-                               rtri(.05,.15,.1),
-                               rtri(.05,.15,.1),
-                               rtri(.02,.1,.05),
+                               rtri(.05,.2,.15),
+                               rtri(.05,.2,.15),
+                               rtri(.02,.1,.075),
                                rtri(.075,.15,.125),
                                rtri(.05,.15,.1)
                              ))
@@ -159,15 +166,31 @@ if(d_modernize == 'Current') {
                              target_side = c(rep('e',4),rep('f',4)),
                              target_class = c(rep(c('inf','arm'),4)),
                              mod = c(
-                               rtri(.05,.2,.15),
-                               rtri(.02,.125,.075),
+                               rtri(.05,.225,.175),
+                               rtri(.02,.125,.1),
                                rtri(.075,.175,.15),
                                rtri(.05,.2,.15),
-                               rtri(.05,.15,.1),
-                               rtri(.02,.1,.05),
+                               rtri(.05,.2,.15),
+                               rtri(.02,.1,.075),
                                rtri(.075,.15,.125),
                                rtri(.05,.15,.1)
                              ))
+}
+
+if(d_modernize == 'Current') {
+  bel_lanc <- data.frame(shooter_side = c(rep('f',4),rep('e',4)),
+                         shooter_class = c(rep(c('inf','inf','arm','arm'),2)),
+                         target_side = c(rep('e',4),rep('f',4)),
+                         target_class = c(rep(c('inf','arm'),4)),
+                         mod = c(.15,.075,.125,.1,.15,.075,.125,.1)
+  )
+} else {
+  bel_lanc <- data.frame(shooter_side = c(rep('f',4),rep('e',4)),
+                         shooter_class = c(rep(c('inf','inf','arm','arm'),2)),
+                         target_side = c(rep('e',4),rep('f',4)),
+                         target_class = c(rep(c('inf','arm'),4)),
+                         mod = c(.15,.075,.15,.15,.1,.05,.125,.1)
+  )
 }
 
 
@@ -175,17 +198,17 @@ if(d_modernize == 'Current') {
 #Terrain Values
 if (d_kt == "All") {
   
-  key_tern <- data.table(s = c('050607','091108','151102','151506'),
+  key_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = 1,type  = 'f')
   
 } else if (d_kt == "Rear") {
   
-  key_tern <- data.table(s = c('050607','091108','151102','151506'),
+  key_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = c(5,5,1,1),type  = 'f')
   
 } else if (d_kt == "Most") {
   
-  key_tern <- data.table(s = c('050607','091108','151102','151506'),
+  key_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = c(3,3,3,1),type  = 'f')
 } else {
   # Code to execute if d_kt is none of the above
@@ -199,27 +222,27 @@ u_eny_obj <- sample(c('Single','Border','Full'),1, prob = c(.5,.4,.1))
 
 if (u_eny_obj == "Full") {
   
-  eny_tern <- data.table(s = c('050607','091108','151102','151506'),
+  eny_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = 1,type  = 'e')
   
 } else if (u_eny_obj == "Border") {
   
-  eny_tern <- data.table(s = c('050607','091108','151102','151506'),
+  eny_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = c(0,1,5,5),type  = 'e')
   
 } else if (u_eny_obj == "Single") {
   
-  eny_tern <- data.table(s = c('050607','091108','151102','151506'),
+  eny_tern <- data.table(s = c('050607','081210','151102','131407'),
                          value = c(0,1,2,5),type  = 'e')
 } else {
   # Code to execute if d_kt is none of the above
   print("doh")
 }
 
-e_units <- data.frame(class = c(rep('inf',4),rep('arm',3)), type = 'e',str = 100)
-e_units$s <- c('141709','151708','141810','171807','161707','151809','151910')
-e_units$id <- paste(e_units$class,e_units$type,1:nrow(e_units),sep = '_')
-e_index <- nrow(e_units) +1
+e_units <- data.frame(class = c(rep('inf',5),rep('arm',3)), type = 'e',str = 100)
+e_units$s <- c('121711','141709','151708','141810','171807','161707','151809','151910')
+e_units$id <- paste(e_units$class,e_units$type,10:(nrow(e_units)+9),sep = '_')
+e_index <- nrow(e_units) +10
 
 f_rein_areas_fwd <- c('091209','101107','081109','091007','101006','081210','071110','090906','080907')
 f_rein_areas_rear <- c('050708','060606','060707','040608','050506','040507','040709','060505','040406')
@@ -237,86 +260,97 @@ rein_type <- c('f','f','e','e')
 rein_class <- c('inf','arm','inf','arm')
 
 
-units <- rbind(f_units,e_units)
+units <- as.data.table(rbind(f_units,e_units))
+# 
 
-turn <- 13
+units_full <- units
 
-for(i in 1:dim(rein_mat)[2]){
-  print(i)
-  if(rein_mat[turn,i]>0){
-    
-    for(j in 1:rein_mat[turn,i]){
+for(turn in 1:n_t){
+  
+  for(i in 1:dim(rein_mat)[2]){
+    #print(i)
+    if(rein_mat[turn,i]>0){
       
-      new_u <- data.frame(class = rein_class[i], type = rein_type[i],str = 100)
-      
-      if(rein_type[i] == 'f' & key_tern[s == '091108']$type == 'f'){
+      for(j in 1:rein_mat[turn,i]){
         
-        if(length(f_rein_areas_fwd[!f_rein_areas_fwd %in% units$s]) > 0){
+        new_u <- data.frame(class = rein_class[i], type = rein_type[i],str = 100)
+        
+        if(rein_type[i] == 'f' & key_tern[s == '081210']$type == 'f'){
           
-          new_u$s <- f_rein_areas_fwd[!f_rein_areas_fwd %in% units$s][1]
-          new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
-          cur_index <- cur_index + 1
-        } else {
+          if(length(f_rein_areas_fwd[!f_rein_areas_fwd %in% units$s]) > 0){
+            
+            new_u$s <- f_rein_areas_fwd[!f_rein_areas_fwd %in% units$s][1]
+            new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
+            cur_index <- cur_index + 1
+          } else {
+            
+            new_u$s <- territory$pos[!territory$pos %in% units$s][1]
+            new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
+            cur_index <- cur_index + 1
+          }
           
-          new_u$s <- territory$pos[!territory$pos %in% units$s][1]
-          new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
-          cur_index <- cur_index + 1
+        } else if(rein_type[i] == 'f' & key_tern[s == '081210']$type == 'f'){
+          
+          if(length(f_rein_areas_rear[!f_rein_areas_rear %in% units$s]) > 0 ){
+            
+            new_u$s <- f_rein_areas_rear[!f_rein_areas_rear %in% units$s][1]
+            new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
+            cur_index <- cur_index + 1
+            
+          } else {
+            
+            new_u$s <- territory$pos[!territory$pos %in% units$s][1]
+            new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
+            cur_index <- cur_index + 1
+          }
+          
+        } else if(rein_type[i] == 'e') {
+          
+          if(length(e_rein_areas[!e_rein_areas %in% units$s])>0){
+            new_u$s <- e_rein_areas[!e_rein_areas %in% units$s][1]
+            
+            new_u$id <- paste(new_u$class,new_u$type,e_index,sep = "_")
+            e_index <- e_index + 1
+          } else {
+            
+            new_u$s <- rev(territory$pos[!territory$pos %in% units$s][1])
+            
+            new_u$id <- paste(new_u$class,new_u$type,e_index,sep = "_")
+            e_index <- e_index + 1
+          }
+          
         }
-        
-      } else if(rein_type[i] == 'f' & key_tern[s == '091108']$type == 'f'){
-        
-        if(length(f_rein_areas_rear[!f_rein_areas_rear %in% units$s]) > 0 ){
-          
-          new_u$s <- f_rein_areas_rear[!f_rein_areas_rear %in% units$s][1]
-          new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
-          cur_index <- cur_index + 1
-          
-        } else {
-          
-          new_u$s <- territory$pos[!territory$pos %in% units$s][1]
-          new_u$id <- paste(new_u$class,new_u$type,cur_index,sep = "_")
-          cur_index <- cur_index + 1
-        }
-        
-      } else if(rein_type[i] == 'e') {
-        
-        if(length(e_rein_areas[!e_rein_areas %in% units$s])>0){
-          new_u$s <- e_rein_areas[!e_rein_areas %in% units$s][1]
-          
-          new_u$id <- paste(new_u$class,new_u$type,e_index,sep = "_")
-          e_index <- e_index + 1
-        } else {
-          
-          new_u$s <- rev(territory$pos[!territory$pos %in% units$s][1])
-          
-          new_u$id <- paste(new_u$class,new_u$type,e_index,sep = "_")
-          e_index <- e_index + 1
-        }
-        
+        units_full <- rbind(units_full,new_u)
+        #print(new_u)
       }
-      units <- rbind(units,new_u)
-      print(new_u)
+      
     }
-    
   }
 }
 
-units
+
+cur_index <- nrow(f_units) +10
+e_index <- nrow(e_units) +10
+
+df_meta <- data.frame(param = c('n','gamma','iter','t','key_terrain','mobilize','modernize','posture','eny_obj'),
+                      value = c(n_c,n_gamma,n_iter,n_t,d_kt,d_mobilize,d_modernize,d_posture,u_eny_obj))
+
+df_rein_out <- data.frame(f_inf = u_f_inf_rein, f_arm = u_f_armor_rein, e_inf = u_e_inf_rein, e_arm = u_e_arm_rein)
 
 
-for(i in 1:0){
-  print(i)
-}
-if(key_tern[s == '091108']$type == 'f') {
-  
-  
-  
-}
-# Sample integer value
-value <- 0  # You can set this to any integer between 0 and 3
+write_csv(df_meta,paste0("results/meta/meta_main_", unique_id, ".csv"))
+write_csv(df_rein_out,paste0("results/meta/meta_rein_", unique_id, ".csv"))
+write_csv(u_lanchester,paste0("results/meta/meta_lanc_", unique_id, ".csv"))
+# units
+# 
+# 
+# for(i in 1:0){
+#   print(i)
+# }
+# if(key_tern[s == '091108']$type == 'f') {
+#   
+#   
+#   
+# }
 
-# Run the loop
-for(i in 1:seq_len(value)) {
-  print(paste("This is iteration", i))
-}
 

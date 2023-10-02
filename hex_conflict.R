@@ -38,12 +38,37 @@ conflict <- function(conflicts,pl, tg,fmod,tmod,fexp,texp) {
   list(players,targets)
 }
 
+normalize_ratio <- function(f, e, cap = 10) {
+  r <- ifelse(e == 0, ifelse(f > 0, cap, 0), f/e)
+  return(pmin(r, cap) / cap)
+}
 
 reward_conf <- function(conf_out, fight_wt = 0.25, terr_wt = 0.75){
   
 
+  #print(conf_out)
+  #rew <- fight_wt*((sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old))  #+
   
-  rew <- fight_wt*((sum(conf_out[[2]]$str_old) - sum(conf_out[[2]]$str))/sum(conf_out[[2]]$str_old))  #+
+  
+  rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,s = conf_out[[1]][order(id)]$s,
+                        a = conf_out[[1]][order(id)]$a,
+                        val = terr_wt*conf_out[[7]])
+  
+  
+
+  grouped_dt <- conf_out[[4]][[1]][, .(f_str_sum = sum(f_str), e_str_sum = sum(e_str)), by = "player"
+  ][, ratio_norm := normalize_ratio(f_str_sum, e_str_sum)
+  ][, .(player, ratio_norm)]
+  
+  # Rename 'player' column to 'id' in grouped_dt
+  setnames(grouped_dt, old = "player", new = "id")
+  # Join the data.tables on 'player'
+  rew_ind <- merge(rew_ind, grouped_dt, by = "id", all.x = TRUE)
+  
+  # Replace NA values with 0 in the ratio_norm column
+  set(rew_ind, which(is.na(rew_ind$ratio_norm)), j = "ratio_norm", value = 0)
+  
+  #print(joined_dt)
   #nrow(conf_out[[2]][str<10])/nrow(conf_out[[2]]) #+
   # print(rew)
   # print(conf_out[[4]])
@@ -52,23 +77,24 @@ reward_conf <- function(conf_out, fight_wt = 0.25, terr_wt = 0.75){
   #   print(conf_out[[2]])
   #   print(rew)
   # }
-
-  rew_ind <- data.table(id = conf_out[[1]][order(id)]$id,s = conf_out[[1]][order(id)]$s,
-                        a = conf_out[[1]][order(id)]$a,
-                        val = terr_wt*conf_out[[7]])
   
 
   
-  rew_ind[id %in% conf_out[[4]][[3]]$player, val := val + rew]
+
   
+  rew_ind[id %in% conf_out[[4]][[3]]$player, val := val + ratio_norm]
+  
+  rew_ind[,ratio_norm := NULL]
+  
+  print(rew_ind)
   # if(conf_out[[2]]$str < 30){
   #   #(conf_out[[2]])
   #   print(rew_ind)
   # }
   # print(conf_out[[4]][[3]])
   # print(conf_out[[2]])
-   # print(rew_ind)
-  return(list(rew,rew_ind))
+   #print(rew_ind)
+  return(rew_ind)
   
 }
 

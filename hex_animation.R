@@ -4,8 +4,18 @@ library(data.table)
 
 source('hex_setup.R')
 
-files <- paste0('validation/',list.files('validation/'))
-table_out <- data.table(read_csv(files[[15]]))
+files <- paste0('sherlock_results/outcome/',list.files('sherlock_results/outcome/'))
+
+
+
+#Ass kicked number 2023083000005017832
+#Kicked ass number 2023083003001459078
+
+#Example draw 2023082909461965887
+#Example loss 2023082912555894777
+#Example win 2023082823384816988
+files[str_detect(files,'')]
+table_out <- data.table(read_csv(files[str_detect(files,'2023082909461965887')][2]))
 
 #70-28
 #42/3
@@ -16,7 +26,7 @@ table_out <- data.table(read_csv(files[[15]]))
 # units_log$turn <- units_log$turn + 10
 # 
 # units_log <- bind_rows(new_log,units_log)
-table_out <- units_log
+#table_out <- units_log
 table_init <- copy(table_out)
 
 table_init[turn == 1, c('sp','turn','a') := .(s,0,'adj0')]
@@ -25,9 +35,11 @@ hexdt <- data.table(hexdf2)[,s := pos]
 str(table_out)
 
 hexdt1 <- unique(hexdt[,list(s,x_pos,y_pos)])
-pieces <- hexdt1[table_out, on = c(s = 'sp'),list(s,a,id,str,type,turn,x_pos,y_pos)]
-pieces[type == 'f', image := "f_inf.svg"]
-pieces[type == 'e', image := 'e_inf.svg']
+pieces <- hexdt1[table_out, on = c(s = 'sp'),list(s,a,id,str,type,class,turn,x_pos,y_pos)]
+pieces[type == 'f' & class == 'inf', image := "f_inf.svg"]
+pieces[type == 'e'& class == 'inf', image := 'e_inf.svg']
+pieces[type == 'f' & class == 'arm', image := "f_arm.svg"]
+pieces[type == 'e'& class == 'arm', image := 'e_arm.svg']
 
 adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
            angle = c(0,(5/6)*2*pi,0,(1/6)*2*pi,(2/6)*2*pi,(3/6)*2*pi,(4/6)*2*pi),
@@ -35,7 +47,7 @@ adj_dt <- data.table(a = c('adj0','adj1','adj2','adj3','adj4','adj5','adj6'),
 
 pieces <- adj_dt[pieces, on = .(a)]
 
-key_tern_s <- c('040507')
+key_tern_s <- c('050607','081210','151102','131407')
 
 hexdt_kt <- hexdt[pos %in% key_tern_s]
 hexdt_kt <- distinct(hexdt_kt[,.(x_pos,y_pos)])
@@ -47,11 +59,11 @@ pnew
 p <- ggplot(pnew, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
   geom_point(data = hexdt_kt, aes(y = y_pos+0.5, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 15) +
-  geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
-  geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
+  geom_tile(data = pnew,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
+  geom_spoke(data =pnew, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
   #geom_text(data = pieces, aes(label = id,color = type),vjust = .25) +
-  geom_image(data=pieces, aes(image = image)) +
+  geom_image(data=pnew, aes(image = image)) +
   scale_fill_distiller(type = "div",direction = 1,limits = c(0,100), palette = "RdYlGn")  +
   scale_color_manual(breaks = c('e','f'), values = c('darkred','darkgreen')) +
   #coord_equal(xlim = c(5,25),ylim = c(0,20)) +
@@ -69,7 +81,8 @@ max(pieces$x_pos)
 ### normal animation
 p1 <- ggplot(pieces, aes(x = x_pos, y = y_pos,group = id)) +
   geom_polygon(data= hexdt,color = 'grey50',aes(group = pos,x=x_h, y = y_h),fill = '#9cc797') +
-  geom_point(data = hexdt_kt, aes(y = y_pos+0.3, x = x_pos),inherit.aes = FALSE, shape = '\u2605', color = 'gold', size = 12) +
+  #geom_polygon(color = 'black',aes(group = pos,fill = disp)) +
+  geom_point(data = cities, aes(x = x_pos, y = y_pos), inherit.aes = F,size = 4) +
   geom_tile(data = pieces,aes(y = y_pos + .5,height = .2, width = 2*str/100,fill = str),color='black') +
   geom_spoke(data =pieces, aes(x = x_pos, y = y_pos, group = id, angle = angle, radius = rad),
              arrow = arrow(length = unit(0.25, "cm")),size = 1) +
@@ -94,8 +107,8 @@ animate(p1)
 
 
 
-animate(p1, height = 6, width = 9,fps = 20,duration = 30, units = "in", res = 320)
-anim_save('images/test_fight_mcts_territory_18may1.gif')
+animate(p1, height = 6, width = 9,fps = 10,duration = 15, units = "in", res = 240)
+anim_save('images/test_fight_mcts_territory_30aug23_draw.gif')
 
 
 pieces_sub <- pieces[turn %in% c(0,2,4,8,14,16,17,18,24)]

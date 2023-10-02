@@ -12,7 +12,7 @@ ggsave('blankplot.jpeg',height = 8, width = 6,dpi = 320)
 
 #Some plots
 
-hexloc <- hexdf2a %>%
+hexloc <- hexdf2 %>%
   select(pos,x_pos,y_pos) %>%
   distinct()
 

@@ -81,7 +81,7 @@ grad_reward <- function(trans,grad,c = 1){
 
 
 
-reward_new <- function(trans,grad_reward,mode = 'mult',ft_wt = 0.75, tr_wt = 0.25){
+reward_new <- function(trans,grad_reward,mode = 'mult',ft_wt = 0.25, tr_wt = 0.75){
   
   r <- tr_wt*grad_reward
   
@@ -101,7 +101,7 @@ reward_new <- function(trans,grad_reward,mode = 'mult',ft_wt = 0.75, tr_wt = 0.2
     rconf <- reward_conf(trans,ft_wt,tr_wt)
 
     
-    rdt <- rconf[[2]]
+    rdt <- rconf
     #print(rdt)
   }
   #print(rdt)
@@ -236,12 +236,12 @@ conf_check2 <- function(players,target,lanc){
     out[,e_str := emod*(e_str / .N), by = target]
     #print(plt)
 
-    print(out)
+    # print(out)
     
     eout <- out[, .(mod = floor(sum(f_str))), by = target]
     fout <- out[, .(mod = floor(sum(e_str))), by = player]
-    print(fout)
-    print(eout)
+    # print(fout)
+    # print(eout)
     
     # df_t <- rbind(df_t, data.table(event = 'conf3_loop',t = Sys.time()-t1))
     
@@ -456,7 +456,6 @@ transition_function2 <- function(plrs,trgt,key_terrain,lanc){
   return(list(plrs,trgt,conf_occ,conf_all,df_t,territory,changeval))
   
 }
-6.44+3.88+.445+.254+4.6+6.62
 
 
 check_and_correct_moves_vec <- function(s, sp) {

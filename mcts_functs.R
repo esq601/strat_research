@@ -8,11 +8,14 @@ source('hex_funcs.R')
 
 execute_action <- function(state,actions,grad,c,
                            lasta,act_dt, probdf, depth,prob_b,
-                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist, ind_q,leg_acts,lanc) {
+                           disc = 0.95,prob_lst,leg_lst,sing_lst,k_t,shrt_dist, ind_q_sel,leg_acts,lanc) {
 
   
-  state <- state[order(-type)]
+  state <- state[order(id)]
+  # print('state')
   # print(state)
+  # print(lasta)
+  # print(shrt_dist)
   t1 <- Sys.time()
   df_t <- data.table()
   sa_dt <- lasta[type == 'e',.(s)]
@@ -32,16 +35,22 @@ execute_action <- function(state,actions,grad,c,
   
   rand_select <- FALSE
   sel_num <- 0
-  
+  # print('lasta')
+  # print(lasta)
+  # print(depth)
+  # print(eny_a)
   selecta <- rbindlist(apply(X = lasta[,.(id,s)], FUN = selfun3,
-                             MARGIN = 1,lst = ind_q))
-
+                             MARGIN = 1,lst = ind_q_sel))
+  # print("select a!")
+  # if(depth == 0) { 
+  #   print('selectaaaaa')
+  #   print(lasta)
+  #   print(selecta)
+  #   }
   # If (s,a) hasn't been explored, add large value to ensure selection
   selecta[,sum_qn := ifelse(n == 0, 1000, q + c*sqrt(log(sum(n))/n)), by = 's']
-
   # Make wide
   wide_dt <- dcast(selecta, id ~ sp, value.var = "sum_qn")
-  
   # Replace NA values with large value to ensure non-selection
   wide_dt[is.na(wide_dt)] <- -100
   
@@ -52,16 +61,25 @@ execute_action <- function(state,actions,grad,c,
   
   # Solve the assignment problem
   assignment <- solve_LSAP(-cost_matrix)
-  
   # Create a final data.table based on the optimal assignment
   opt_move <- data.table(id = wide_dt$id, sp = colnames(cost_matrix)[assignment], qn_sum = cost_matrix[cbind(seq_len(nrow(cost_matrix)), assignment)])
 
   
   selecta <- selecta[opt_move, on = .(id, sp)]
-  
+  # print('second selecta!')
+  # print(selecta)
   
   df_t <- rbind(df_t, data.table(event = 'select_fun',t = Sys.time()-t1))
-  
+  # if(depth == 0 ){
+  #   print(selecta)
+  #   
+  #   print(wide_dt)
+  #   
+  #   print(cost_matrix)
+  #   
+  #   print(assignment)
+  #   
+  # }
   ### New enemy belief select ####
   
   t1 <- Sys.time()
@@ -74,6 +92,9 @@ execute_action <- function(state,actions,grad,c,
   #dtout <- apply(s_act,FUN = samefun,MARGIN = 1,olist = leg_lst)
   df_t <- rbind(df_t, data.table(event = 'same_fun',t = Sys.time()-t1))
   
+  # print('enemy sel')
+  # print(s_act)
+  
   actvec <- c(selecta$a,s_act$a)
   sp_sel <- c(selecta$sp, s_act$sp)
   ##### Move Select #####
@@ -81,11 +102,16 @@ execute_action <- function(state,actions,grad,c,
   t1 <- Sys.time()
   
   move <- state
+  # print('move')
+  # print(move)
+  setorder(move, -type, id)
   move$a <- actvec
   move$sp <- sp_sel
-  
+  # print('move')
+  # print(move)
+
   #df_t <- rbind(df_t, data.table(event = 'move_select_2paste',t = Sys.time()-t1))
-  
+  # print(move)
   t2 <- Sys.time()
   
   trans <- transition_function2(move[type == 'f'],move[type == 'e'],k_t,lanc)
@@ -171,8 +197,10 @@ q_setup <- function(unit_obj, legal_a){
   return(ind_q_lst)
 }
 
-simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
-                          n_iter = 250, depth = 5, actions,k_terr, gamma = 0.95,lanc_df){
+
+simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,n_turns,
+                          n_iter = 250, depth = 5, actions,k_terr, gamma = 0.95,lanc_df,turnval,
+                          ind_f, ind_e, afil_val, opp_val){
   
   avg_u <- 0
   bigval <- 0
@@ -201,8 +229,11 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
   
   
   while(i < n_iter ){
-    
+    # print(ind_f)
+    # print(ind_e)
     units_new <- unit_obj
+    sim_index <- ind_f
+    sim_e_index <- ind_e
     
     key_terr <- k_terr
     
@@ -215,9 +246,14 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
       print(paste('100 Iter Time:',Sys.time()-time_stamp))
       time_stamp <- Sys.time()
     }
-
-    
-    while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j < depth){
+# 
+#     print(units_new)
+#     print(turnval)
+#     print(j)
+#     print(depth)
+    while(max(units_new[type == 'f']$str) > 10 & max(units_new[type == 'e']$str) > 10 & j+turnval <= n_turns){
+      
+      # print('yoooo')
       
       input_state <- data.table(id = units_new$id,s = units_new$s,str = units_new$str, 
                                 type = units_new$type, class = units_new$class)
@@ -230,7 +266,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
                             c=c, lasta = input_state,act_dt = actions_dt,
                             probdf = single_out, depth = j,prob_b = prob_base, disc = gamma,
                             prob_lst = prob_ls, leg_lst = leg_ls, k_t = key_terr,
-                            shrt_dist = eny_dist, ind_q = ind_q_lst, leg_acts = legal_a,lanc = lanc_df)
+                            shrt_dist = eny_dist, ind_q_sel = ind_q_lst, leg_acts = legal_a,lanc = lanc_df)
       
       t1 <- Sys.time()
       
@@ -241,7 +277,8 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
       
       lst_temp <- out[[2]][[2]]
       lst_temp$turn <- j
-      
+      # print(lst_out)
+      # print(lst_temp)
       lst_out <- rbind(lst_out,lst_temp)
 
       
@@ -251,8 +288,104 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
       
       old_len <- nrow(units_new)
       
-      units_new <- units_new[str > 10]
       
+      ### Remove lost units
+      units_new <- units_new[str > 30]
+      
+      
+      ### Add reinforcements
+      # print('trns')
+      # print(turnval)
+      # print(j)
+      turn <- turnval + j
+      # print(turn)
+      for(ik in 1:dim(rein_mat)[2]){
+        
+        if(rein_mat[turn,ik]>0){
+          # print('here')
+          # print(rein_mat[turn,ik])
+          for(jk in 1:rein_mat[turn,ik]){
+            
+            new_u <- data.frame(class = rein_class[ik],str = 100)
+            # print(key_tern)
+            if(rein_type[ik] == 'f' & key_tern[s == '081210']$type == afil_val){
+              
+              if(length(f_rein_areas_fwd[!f_rein_areas_fwd %in% units_new$s]) > 0){
+                
+                new_u$s <- f_rein_areas_fwd[!f_rein_areas_fwd %in% units_new$s][1]
+                new_u$id <- paste(new_u$class,'f',sim_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','f','e')
+                sim_index <- sim_index + 1
+              } else {
+                
+                new_u$s <- territory$pos[!territory$pos %in% units_new$s][1]
+                new_u$id <- paste(new_u$class,'f',sim_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','f','e')
+                sim_index <- sim_index + 1
+              }
+              
+            } else if(rein_type[ik] == 'f' & key_tern[s == '081210']$type == opp_val){
+              
+              if(length(f_rein_areas_rear[!f_rein_areas_rear %in% units_new$s]) > 0 ){
+                
+                new_u$s <- f_rein_areas_rear[!f_rein_areas_rear %in% units_new$s][1]
+                new_u$id <- paste(new_u$class,'f',sim_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','f','e')
+                sim_index <- sim_index + 1
+                
+              } else {
+                
+                new_u$s <- territory$pos[!territory$pos %in% units_new$s][1]
+                new_u$id <- paste(new_u$class,'f',cur_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','f','e')
+                sim_index <- sim_index + 1
+              }
+              
+            } else if(rein_type[ik] == 'e') {
+              
+              if(length(e_rein_areas[!e_rein_areas %in% units_new$s])>0){
+                new_u$s <- e_rein_areas[!e_rein_areas %in% units_new$s][1]
+                
+                new_u$id <- paste(new_u$class,'e',sim_e_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','e','f')
+                sim_e_index <- sim_e_index + 1
+              } else {
+                
+                new_u$s <- rev(territory$pos[!territory$pos %in% units_new$s][1])
+                
+                new_u$id <- paste(new_u$class,'e',sim_e_index,sep = "_")
+                new_u$type <- ifelse(afil_val == 'f','e','f')
+                sim_e_index <- sim_e_index + 1
+              }
+              
+            }
+             # print(new_u)
+            # new_q_lst <- q_setup(as.data.table(new_u), as.data.table(legal_a))
+            # # print((ind_q_lst$`131104`))
+            # # print('to add')
+            # # print((new_q_lst$`131104`))
+            # 
+            # player_data <- lapply(names(ind_q_lst), function(state) {
+            #   c(ind_q_lst[[state]], new_q_lst[[state]])
+            # })
+            # 
+            # names(player_data) <- names(ind_q_lst)
+            # 
+            # ind_q_lst <- player_data
+            
+            #ind_q_lst <- c(ind_q_lst, new_q_lst)
+            #print('second')
+            #print((ind_q_lst$`131104`))
+            new_u$a <- 'adj0'
+            units_new <- rbind(units_new,new_u)
+            
+          }
+          
+        }
+      }
+      
+      
+      ### Key terrain
       key_terr <- out[[6]]
 
       units_new[, a:= NULL]
@@ -269,6 +402,7 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
     
     setorder(lst_out, id, turn)
     
+    lst_out[, val := val * (gamma ^ turn)]
     lst_out[, q_new := rev(Reduce(function(x, y) gamma * x + y, rev(val), accumulate = TRUE)), by = id]
     
     #print(lst_out)
@@ -283,8 +417,15 @@ simulate_mcts <- function(unit_obj, ind_q_in, legal_a, terr_loc, q, c = 5,
     
     
     
+    
     for(k in 1:nrow(lst_out)){
       dt <- ind_q_lst[[lst_out[[k,2]]]][[lst_out[[k,1]]]]
+      
+      # if(k == 1 ){
+      #   print('heeeere')
+      #   print(lst_out)
+      #   print(dt)
+      # }
       rows_to_update <- dt$a %in% lst_out[[k,3]]
       
       # update n
@@ -430,4 +571,3 @@ find_move <- function(current_id, target_id) {
   
   return(find_shortest_distance(current_id, target_id))
 }
-
