@@ -466,6 +466,8 @@ ev_data <- data_joined %>%
   #mutate(mean_new = mean * p_inv) %>%
   mutate(rowval = row_number())
 
+ev_data_pf <- ev_data %>%
+  select(key_terrain, mobilize, posture, modernize, p_f_new)
 
 n_samples <- 500
 
